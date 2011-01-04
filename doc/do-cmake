@@ -1,0 +1,8 @@
+#!/bin/bash
+
+rm -f CMakeCache.txt
+
+cmake \
+ -D CMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+ -D CJ_TRILINOS_DIR:FILEPATH=/usr/local/trilinos-10.6.2/mpi/opt \
+ ..

@@ -1,0 +1,12 @@
+.DS_Store
+*~
+.project
+.cproject
+*.o
+*.a
+*.dylib
+build
+CMakeFiles
+CMakeCache
+cmake_install.cmake
+Makefile
