@@ -1,7 +1,9 @@
 
 #
 SET(SOURCES
-	cj_main.cpp 
+	cj_main.cpp
+	messages.cpp 
+	mesh_reader.cpp
   )
 
 SET(HEADERS
