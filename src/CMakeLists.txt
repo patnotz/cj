@@ -3,7 +3,7 @@
 SET(SOURCES
 	cj_main.cpp
 	messages.cpp 
-	mesh_reader.cpp
+	mesh_manager.cpp
   )
 
 SET(HEADERS
