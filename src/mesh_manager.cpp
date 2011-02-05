@@ -12,6 +12,7 @@
 
 #include <../include/mesh_manager.h>
 #include <../include/messages.h>
+#include <../include/main.h>
 
 #include "exodusII.h"
 #include "netcdf.h"
@@ -21,10 +22,9 @@ using namespace std;
 void
 Mesh_Manager::read_mesh()
 {
-	string method_name = "Mesh_Manager::initialize_read()";
+	stringstream oss;
 	int error;
 	float version;
-	stringstream oss;
 
 	my_CPU_word_size = 0;
 	my_IO_word_size = 0;
@@ -36,8 +36,6 @@ Mesh_Manager::read_mesh()
 		sub_progress_message(&oss);
 		exit(1);
 	}
-	oss << "Mesh read successfully";
-	sub_progress_message(&oss);
 
 	initialize_read();
 	import_nodes();
@@ -57,9 +55,10 @@ Mesh_Manager::initialize_read()
 	  int error;
 	  stringstream oss;
 
+#ifdef DEBUG_OUTPUT
 	  oss << "Reading file: " << my_input_file_name;
 	  progress_message(&oss, method_name);
-
+#endif
 	  /* read database parameters */
 	  char title[MAX_LINE_LENGTH+1];
 
@@ -97,10 +96,12 @@ Mesh_Manager::import_nodes()
 void
 Mesh_Manager::import_elem_map()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::import_elem_map()";
 	stringstream oss;
 	oss << "Reading element map";
 	progress_message(&oss,method_name);
+#endif
 
 	int error;
 	/* read element order map */
@@ -111,15 +112,15 @@ Mesh_Manager::import_elem_map()
 void
 Mesh_Manager::import_blocks()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::import_blocks()";
-
+	stringstream oss;
+	oss << "Reading blocks";
+	progress_message(&oss,method_name);
+#endif
 
 	char elem_type[MAX_STR_LENGTH+1];
 	int error;
-	stringstream oss;
-
-	oss << "Reading blocks";
-	progress_message(&oss,method_name);
 
 	/* read element block parameters */
 	my_block_ids = (int *) calloc(my_num_elem_blk, sizeof(int));
@@ -133,10 +134,9 @@ Mesh_Manager::import_blocks()
 				&(my_num_elem_in_block[i]),
 				&(my_num_nodes_per_elem[i]), &(my_num_attr[i]));
 
-		cout << "inserting into block " << my_block_ids[i] << " an element tupe of " << elem_type << endl;
-
         my_elem_types.insert(pair<int,string>(my_block_ids[i],elem_type));
 
+#ifdef DEBUG_OUTPUT
 		oss << "Element block: " << my_block_ids[i];
 		sub_progress_message(&oss);
 		oss << "Element type: " << elem_type;
@@ -147,44 +147,45 @@ Mesh_Manager::import_blocks()
 		sub_sub_progress_message(&oss);
 		oss << "Number of attributes: " << my_num_attr[i];
 		sub_sub_progress_message(&oss);
+#endif
 	};
 }
 
 void
 Mesh_Manager::import_connectivities()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::import_connectivity()";
-	int error;
 	stringstream oss;
+#endif
+
+	int error;
 	int * connectivity;
 
 	/* read element connectivity */
 	for (int i=0; i<my_num_elem_blk; i++)
 	{
+#ifdef DEBUG_OUTPUT
 		oss << "Reading connectivity for block " << my_block_ids[i];
 		progress_message(&oss, method_name);
-
+#endif
 		connectivity = (int *) calloc((my_num_nodes_per_elem[i] * my_num_elem_in_block[i]),
 				sizeof(int));
 		error = ex_get_elem_conn (my_input_exoid, my_block_ids[i], connectivity);
         my_connectivities.insert(pair<int,int*>(my_block_ids[i],connectivity));
-
 		// print_connectivity(my_block_ids[i]);
-		// free(connectivity)
 	}
-//	free (ids);
-//	free (num_nodes_per_elem);
-//	free (num_attr);
 }
 
 void
 Mesh_Manager::print_connectivity(int block_id)
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::print_connectivity()";
 	stringstream oss;
 	oss << "Block ID: " << block_id;
 	progress_message(&oss,method_name);
-
+#endif
 	if(my_connectivities.find(block_id)==my_connectivities.end())
 		return;
 
@@ -207,34 +208,32 @@ Mesh_Manager::print_connectivity(int block_id)
 void
 Mesh_Manager::import_node_sets()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::import_node_sets()";
 	stringstream oss;
+	oss << "Reading node sets";
+	progress_message(&oss,method_name);
+#endif
 	int error;
-
-//	int num_nodes_in_set;
-//	int num_df_in_set;
 	int * node_list;
 	float * dist_fact;
 
-	oss << "Reading node sets";
-	progress_message(&oss,method_name);
-
-	/* read individual node sets */
 	my_node_set_ids = (int *) calloc(my_num_node_sets, sizeof(int));
 	my_num_nodes_in_node_set = (int *) calloc(my_num_node_sets, sizeof(int));
 	my_num_df_in_node_set = (int *) calloc(my_num_node_sets, sizeof(int));
 	error = ex_get_node_set_ids (my_input_exoid, my_node_set_ids);
 	for (int i=0; i<my_num_node_sets; i++)
 	{
-		oss << "Node set: " << my_node_set_ids[i];
-		sub_progress_message(&oss);
 		error = ex_get_node_set_param (my_input_exoid, my_node_set_ids[i],
 				&(my_num_nodes_in_node_set[i]), &(my_num_df_in_node_set[i]));
+#ifdef DEBUG_OUTPUT
+		oss << "Node set: " << my_node_set_ids[i];
+		sub_progress_message(&oss);
 		oss << "Number of nodes in set: " << my_num_nodes_in_node_set[i];
 		sub_sub_progress_message(&oss);
 		oss << "Number of distribution factors in set: " << my_num_df_in_node_set[i];
 		sub_sub_progress_message(&oss);
-
+#endif
 		node_list = (int *) calloc(my_num_nodes_in_node_set[i], sizeof(int));
 		dist_fact = (float *) calloc(my_num_nodes_in_node_set[i], sizeof(float));
 		error = ex_get_node_set (my_input_exoid, my_node_set_ids[i], node_list);
@@ -244,45 +243,40 @@ Mesh_Manager::import_node_sets()
 		}
         my_node_set_node_lists.insert(pair<int,int*>(my_node_set_ids[i],node_list));
         my_node_set_dist_factors.insert(pair<int,float*>(my_node_set_ids[i],dist_fact));
-
-//		free (node_list);
-//		free (dist_fact);
 	}
-// free (ids);
 }
 
 void
 Mesh_Manager::import_side_sets()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::import_side_sets()";
-	int error;
 	stringstream oss;
-
 	oss << "Reading side sets";
 	progress_message(&oss,method_name);
-
-	//  int num_sides_in_set;
-	//  int num_elem_in_set;
+#endif
+	int error;
 	int * elem_list;
 	int * node_list;
 	float * dist_fact;
 	int * side_list;
 	int * node_ctr_list;
 
-	/* read individual side sets */
 	my_side_set_ids = (int *) calloc(my_num_side_sets, sizeof(int));
 	my_num_elem_in_side_set = (int *) calloc(my_num_side_sets, sizeof(int));
 	my_num_df_in_side_set = (int *) calloc(my_num_side_sets, sizeof(int));
-
 	error = ex_get_side_set_ids (my_input_exoid, my_side_set_ids);
+
 	for (int i=0; i<my_num_side_sets; i++)
 	{
 		error = ex_get_side_set_param (my_input_exoid, my_side_set_ids[i], &(my_num_elem_in_side_set[i]),
 				&(my_num_df_in_side_set[i]));
+#ifdef DEBUG_OUTPUT
 		oss << "Side set " << my_side_set_ids[i];
 		sub_progress_message(&oss);
 		oss << "Number of elements: " << my_num_elem_in_side_set[i];
 		sub_sub_progress_message(&oss);
+#endif
 		/* Note: The # of elements is same as # of sides! */
 		elem_list = (int *) calloc(my_num_elem_in_side_set[i], sizeof(int));
 		side_list = (int *) calloc(my_num_elem_in_side_set[i], sizeof(int));
@@ -301,31 +295,26 @@ Mesh_Manager::import_side_sets()
         my_side_set_node_ctr_lists.insert(pair<int,int*>(my_side_set_ids[i],node_ctr_list));
         my_side_set_dist_factors.insert(pair<int,float*>(my_side_set_ids[i],dist_fact));
         my_side_set_side_lists.insert(pair<int,int*>(my_side_set_ids[i],side_list));
-
-//		free (elem_list);
-//		free (side_list);
-//		free (node_ctr_list);
-//		free (node_list);
-//		free (dist_fact);
 	}
 }
 
 void
 Mesh_Manager::initialize_output(char * title)
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_output()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing output file: " << my_output_file_name;
 	progress_message(&oss,method_name);
+#endif
+
+	int error;
 
 	my_CPU_word_size = 0;
 	my_IO_word_size = 0;
 	/* create EXODUS II file */
 	my_output_exoid = ex_create (my_output_file_name,EX_CLOBBER,&my_CPU_word_size, &my_IO_word_size);
 
-	//const char* title = (char*)"This is a test";
 	error = ex_put_init (my_output_exoid, title, my_num_dim, my_num_nodes, my_num_elem, my_num_elem_blk, my_num_node_sets, my_num_side_sets);
 
     write_coordinates();
@@ -354,51 +343,47 @@ Mesh_Manager::initialize_output(char * title)
 void
 Mesh_Manager::write_coordinates()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_coordinates()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing coordinates";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	error = ex_put_coord (my_output_exoid, my_x, my_y, my_z);
 	char * coord_names[3];
 	coord_names[0] = (char*)"xcoor";
 	coord_names[1] = (char*)"ycoor";
 	coord_names[2] = (char*)"zcoor";
-	error = ex_put_coord_names (my_output_exoid, coord_names); /* write element order map */
+	error = ex_put_coord_names (my_output_exoid, coord_names);
 }
 
 void
 Mesh_Manager::write_elem_map()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_elem_map()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing element map";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	error = ex_put_map (my_output_exoid, my_elem_map);
 }
 
 void
 Mesh_Manager::write_elem_blocks()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_elem_blocks()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing element blocks";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	for(int i=0; i<my_num_elem_blk;++i)
 	{
-		cout << " block: " << my_block_ids[i] << endl;
-		cout << " This is the elem_type: " << my_elem_types.find(my_block_ids[i])->second << endl;
-
 		string elem_type_str = my_elem_types.find(my_block_ids[i])->second;
-		cout << " This is the string for elem type: " << elem_type_str << endl;
         char * elem_type = const_cast<char *>(elem_type_str.c_str());
 		error = ex_put_elem_block (my_output_exoid, my_block_ids[i], elem_type, my_num_elem_in_block[i], my_num_nodes_per_elem[i], 0);
 		/* write element block properties */
@@ -413,16 +398,15 @@ Mesh_Manager::write_elem_blocks()
 void
 Mesh_Manager::write_elem_connectivities()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_elem_connectivity()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing element connectivity";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	int * connect;
 
-	/* write element connectivity */
 	for(int i=0; i<my_num_elem_blk;++i)
 	{
 		connect = my_connectivities.find(my_block_ids[i])->second;
@@ -433,13 +417,14 @@ Mesh_Manager::write_elem_connectivities()
 void
 Mesh_Manager::write_node_sets()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_node_sets()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing node sets";
 	progress_message(&oss,method_name);
+#endif
 
+	int error;
 	for(int i=0; i<my_num_node_sets;++i)
 	{
 		error = ex_put_node_set_param (my_output_exoid, my_node_set_ids[i], my_num_nodes_in_node_set[i], my_num_df_in_node_set[i]);
@@ -454,17 +439,15 @@ Mesh_Manager::write_node_sets()
 void
 Mesh_Manager::write_side_sets()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_side_sets()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing side sets";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	for(int i=0; i<my_num_side_sets;++i)
 	{
-		cout << " writing side set: " << my_side_set_ids[i] << endl;
-
 		error = ex_put_side_set_param (my_output_exoid, my_side_set_ids[i], my_num_elem_in_side_set[i], my_num_df_in_side_set[i]);
 		error = ex_put_side_set (my_output_exoid, my_side_set_ids[i], my_side_set_elem_lists.find(my_side_set_ids[i])->second, my_side_set_side_lists.find(my_side_set_ids[i])->second);
 		error = ex_put_side_set_dist_fact (my_output_exoid, my_side_set_ids[i], my_side_set_dist_factors.find(my_side_set_ids[i])->second);
@@ -475,16 +458,14 @@ Mesh_Manager::write_side_sets()
 void
 Mesh_Manager::write_qa_records()
 {
-	string method_name = "Mesh_Manager::write_qa_records()";
-	int error;
 	stringstream oss;
-
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_qa_records()";
 	oss << "Writing Q & A records";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	char *qa_record[1][4];
-
-	/* write QA records */
 	int num_qa_rec = 1;
 
 	qa_record[0][0] = (char*)"ANLYSIS CODE NAME GOES HERE";
@@ -512,15 +493,14 @@ Mesh_Manager::write_qa_records()
 void
 Mesh_Manager::write_variable_names()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_variable_names()";
-	int error;
 	stringstream oss;
-
 	oss << "Writing variable names";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	int num_global_variables = my_global_variable_names.size();
-	cout << "number of global variables" << num_global_variables << endl;
 	char* global_var_names[num_global_variables];
 	for(int i=0; i<num_global_variables;++i)
 	{
@@ -528,9 +508,7 @@ Mesh_Manager::write_variable_names()
 	}
 	error = ex_put_var_param (my_output_exoid, (char*)"g", num_global_variables);
 	error = ex_put_var_names (my_output_exoid, (char*)"g", num_global_variables, global_var_names);
-
 	int num_nodal_variables = my_nodal_variable_names.size();
-	cout << "number of nodal variables" << num_nodal_variables << endl;
 	char* nodal_var_names[num_nodal_variables];
 	for(int i=0; i<num_nodal_variables;++i)
 	{
@@ -538,10 +516,7 @@ Mesh_Manager::write_variable_names()
 	}
 	error = ex_put_var_param (my_output_exoid, (char*)"n", num_nodal_variables);
 	error = ex_put_var_names (my_output_exoid, (char*)"n", num_nodal_variables, nodal_var_names);
-
 	int num_element_variables = my_element_variable_names.size();
-	cout << "number of element variables" << num_element_variables << endl;
-
 	char* ele_var_names[num_element_variables];
 	for(int i=0; i<num_element_variables;++i)
 	{
@@ -551,58 +526,16 @@ Mesh_Manager::write_variable_names()
 	error = ex_put_var_names (my_output_exoid, (char*)"e", num_element_variables, ele_var_names);
 }
 
-//void
-//Mesh_Manager::write_variables_to_output(int time_step, float time_value, float * global_var_vals, float * nodal_var_vals, float * elem_var_vals)
-//{
-//	string method_name = "Mesh_Manager::write_variables_to_output()";
-//	int error;
-//	stringstream oss;
-//
-//	oss << "Writing variables to output";
-//	progress_message(&oss,method_name);
-//
-//	if(!my_output_is_initialized)
-//	{
-//		oss << "Output file is not initialized, can't write variables to file: " << my_output_file_name;
-//		error_message(&oss);
-//	}
-//
-//	/* write time value */
-//	error = ex_put_time (my_output_exoid, time_step, &time_value);
-//
-//	int num_glo_vars = my_global_variable_names.size();
-//	/* write global variables */
-//	error = ex_put_glob_vars (my_output_exoid, time_step, num_glo_vars, global_var_vals);
-//	/* write nodal variables */
-//    int num_nod_vars = my_nodal_variable_names.size();
-//	for (int k=1; k<=num_nod_vars; k++)
-//	{
-//		error = ex_put_nodal_var (my_output_exoid, time_step, k, my_num_nodes, nodal_var_vals);
-//	}
-//	/* write element variables */
-//	int num_ele_vars = my_element_variable_names.size();
-//	for (int k=1; k<=num_ele_vars; k++)
-//	{
-//		for (int j=0; j<my_num_elem_blk; j++)
-//		{
-//			error = ex_put_elem_var (my_output_exoid, time_step, k, my_block_ids[j],my_num_elem_in_block[j], elem_var_vals);
-//		}
-//	}
-//	/* update the data file; this should be done at the end of every time step * to ensure that no data is lost if the analysis dies */
-//	error = ex_update (my_output_exoid);
-//
-//	//free(glob_var_vals); free(nodal_var_vals); free(elem_var_vals);
-//}
-
 void
 Mesh_Manager::write_time_step_info(int time_step_num, float time_value)
 {
-	string method_name = "Mesh_Manager::write_time_step_info()";
-	int error;
 	stringstream oss;
-
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_time_step_info()";
 	oss << "Writing time step info to output";
 	progress_message(&oss,method_name);
+#endif
+	int error;
 
 	if(!my_output_is_initialized)
 	{
@@ -615,13 +548,13 @@ Mesh_Manager::write_time_step_info(int time_step_num, float time_value)
 void
 Mesh_Manager::update_output()
 {
+#ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::update_output()";
-	int error;
 	stringstream oss;
-
 	oss << "Updating output";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	/* update the data file; this should be done at the end of every time step * to ensure that no data is lost if the analysis dies */
 	error = ex_update (my_output_exoid);
 }
@@ -629,12 +562,13 @@ Mesh_Manager::update_output()
 void
 Mesh_Manager::write_global_variables_to_output(int time_step, float time_value, float * global_var_vals)
 {
-	string method_name = "Mesh_Manager::write_global_variables_to_output()";
-	int error;
 	stringstream oss;
-
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_global_variables_to_output()";
 	oss << "Writing global variables to output";
 	progress_message(&oss,method_name);
+#endif
+	int error;
 
 	if(!my_output_is_initialized)
 	{
@@ -648,12 +582,13 @@ Mesh_Manager::write_global_variables_to_output(int time_step, float time_value, 
 void
 Mesh_Manager::write_nodal_variable_to_output(int time_step, float time_value, float * nodal_var_vals, int node_var_index)
 {
-	string method_name = "Mesh_Manager::write_nodal_variable_to_output()";
-	int error;
 	stringstream oss;
-
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_nodal_variable_to_output()";
 	oss << "Writing nodal variable to output";
 	progress_message(&oss,method_name);
+#endif
+	int error;
 
 	if(!my_output_is_initialized)
 	{
@@ -666,13 +601,13 @@ Mesh_Manager::write_nodal_variable_to_output(int time_step, float time_value, fl
 void
 Mesh_Manager::write_element_variable_to_output(int time_step, float time_value, float * elem_var_vals, int ele_var_index, int block_index)
 {
-	string method_name = "Mesh_Manager::write_element_variable_to_output()";
-	int error;
 	stringstream oss;
-
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_element_variable_to_output()";
 	oss << "Writing element variable to output";
 	progress_message(&oss,method_name);
-
+#endif
+	int error;
 	if(!my_output_is_initialized)
 	{
 		oss << "Output file is not initialized, can't write variables to file: " << my_output_file_name;
@@ -687,21 +622,6 @@ Mesh_Manager::close_output_file()
 	int error;
 	error = ex_close (my_output_exoid);
 }
-
-//void
-//Mesh_Manager::insert_var_name(string & name, std::vector<string> * vector)
-//{
-//	bool found = false;
-//	for(int i=0; i<vector->size(); ++i)
-//	{
-//		string vec_name = vector[i];
-//		if(vec_name==name)
-//			found = true;
-//	}
-//	if(!found)
-//		vector->push_back(name);
-//}
-
 
 void
 Mesh_Manager::gregs_output()

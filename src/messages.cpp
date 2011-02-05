@@ -8,6 +8,7 @@
 #include <sstream>
 #include <time.h>
 #include <../include/messages.h>
+//#include <../include/trace.h>
 
 using namespace std;
 
@@ -24,13 +25,13 @@ start_message()
 	int year = current->tm_year + 1900;
 	int month = current->tm_mon + 1;
 	cout << "  Date:    " << month << "/" <<  current->tm_mday << "/" << year << endl;
-	printf("  Time:    %i:%i:%i\n\n", current->tm_hour, current->tm_min, current->tm_sec);
+	printf("  Time:    %i:%i:%i\n", current->tm_hour, current->tm_min, current->tm_sec);
 }
 
 void
 success_message()
 {
-	cout << endl << "%%%    Simulation completed successfully    %%%" << endl;
+	cout << endl << "  %    Simulation completed successfully    %" << endl;
 }
 
 
