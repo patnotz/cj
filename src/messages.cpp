@@ -8,7 +8,6 @@
 #include <sstream>
 #include <time.h>
 #include <../include/messages.h>
-//#include <../include/trace.h>
 
 using namespace std;
 
@@ -61,7 +60,20 @@ void
 error_message(stringstream * oss)
 {
 	string message = oss->str();
-	cout << "% ERROR % " << message << endl;
+	std::cerr << "% ERROR % " << message << endl;
+	oss->str(""); oss->clear();
+}
+
+void
+printStatus(bool status, stringstream * oss)
+{
+	string message = oss->str();
+  if (status) {
+    cout << "  " << message << " [ PASSED ]" << std::endl;
+  }
+  else {
+    cout << "  " << message << "[ FAILED ]" << std::endl;
+  }
 	oss->str(""); oss->clear();
 }
 

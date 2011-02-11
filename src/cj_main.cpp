@@ -1,41 +1,49 @@
 #include <iostream>
+#include <../include/main.h>
 #include <../include/mesh_manager.h>
 #include <../include/messages.h>
-//#include "exodusII.h"
-//#include "netcdf.h"
-
+#include <../include/stk_mesh.h>
 
 using namespace std;
 
-int main()
+int main( int argc, char * argv[] )
 {
 	start_message();
 
 	// This information is hard coded for now, until we have an input reader:
-	char* mesh_input_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.g";
-	char* mesh_output_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.e";
+	const char* mesh_input_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.g";
+	const char* mesh_output_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.e";
 
-	Mesh_Manager mesh_manager;
-	mesh_manager.set_input_file(mesh_input_file_name);
+	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name);
 	mesh_manager.read_mesh();
-	mesh_manager.set_output_file(mesh_output_file_name);
 
-	//  CREATE BOGUS OUTPUT FOR NOW
+    stk::ParallelMachine parallel_machine = stk::parallel_machine_init(&argc, &argv);
+    stk::mesh::STK_Mesh stk_mesh(parallel_machine, mesh_manager.dimension());
 
-	char * glo_var_1 = (char *)"test_global_var_1";
-	char * glo_var_2 = (char *)"test_global_var_2";
-	mesh_manager.insert_global_var_name(glo_var_1);
-	mesh_manager.insert_global_var_name(glo_var_2);
-	char * node_var_1 = (char *)"test_nodal_var_1";
-	char * node_var_2 = (char *)"test_nodal_var_2";
-	mesh_manager.insert_nodal_var_name(node_var_1);
+    mesh_manager.populate_STK_mesh(&stk_mesh);
+
+    bool local_status = true ;
+    local_status = mesh_manager.verify_coordinates_field(stk_mesh);
+    stringstream oss;
+    oss << "Verifying the STK mesh coordinates field: ";
+    printStatus(local_status, &oss);
+
+	//  CREATE BOGUS FIELDS FOR NOW the following is not linked to stk mesh stuff above yet
+
+    const char * glo_var_1 = (const char *)"test_global_var_1";
+    const char * glo_var_2 = (const char *)"test_global_var_2";
+    mesh_manager.insert_global_var_name(glo_var_1);
+    mesh_manager.insert_global_var_name(glo_var_2);
+    const char * node_var_1 = (const char *)"test_nodal_var_1";
+    const char * node_var_2 = (const char *)"test_nodal_var_2";
+    mesh_manager.insert_nodal_var_name(node_var_1);
 	mesh_manager.insert_nodal_var_name(node_var_2);
-	char * ele_var_1 = (char *)"test_element_var_1";
-	char * ele_var_2 = (char *)"test_element_var_2";
+	const char * ele_var_1 = (const char *)"test_element_var_1";
+	const char * ele_var_2 = (const char *)"test_element_var_2";
 	mesh_manager.insert_element_var_name(ele_var_1);
 	mesh_manager.insert_element_var_name(ele_var_2);
 
-	char * title = (char*)"This is a test";
+	const char * title = (const char*)"This is a test";
 	mesh_manager.initialize_output(title);
 
 	const int num_glo_vars = mesh_manager.num_global_variables();
@@ -84,16 +92,11 @@ int main()
 				free(elem_var_vals);
 			}
 		}
-//		mesh_manager.write_variables_to_output(time_step, time_value, glob_var_vals, nodal_var_vals, elem_var_vals);
 		mesh_manager.update_output();
 		time_step++;
 	}
 
     mesh_manager.close_output_file();
 
-    mesh_manager.gregs_output();
-
 	success_message();
 }
-
-

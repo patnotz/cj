@@ -18,5 +18,6 @@ void progress_message(stringstream * oss, string & name);
 void sub_progress_message(stringstream * oss);
 void sub_sub_progress_message(stringstream * oss);
 void error_message(stringstream * oss);
+void printStatus(bool status, stringstream * oss);
 
 #endif /* MESSAGES_H_ */

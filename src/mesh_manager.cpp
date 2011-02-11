@@ -13,11 +13,269 @@
 #include <../include/mesh_manager.h>
 #include <../include/messages.h>
 #include <../include/main.h>
+#include <../include/stk_mesh.h>
+#include <stk_mesh/fem/TopologyHelpers.hpp>
+#include <stk_mesh/base/FieldData.hpp>
 
 #include "exodusII.h"
 #include "netcdf.h"
 
 using namespace std;
+
+Mesh_Manager::Mesh_Manager(const char * input_file_name, const char * output_file_name)
+:  my_input_file_name(input_file_name),
+   my_output_file_name(output_file_name),
+   my_input_initialized(false),
+   my_output_initialized(false)
+{}
+
+Mesh_Manager::~Mesh_Manager()
+{}
+
+void
+Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::populate_STK_mesh()";
+	oss << "Populating STK mesh";
+	progress_message(&oss, method_name);
+#endif
+	if(!my_input_initialized)
+	{
+		oss << "Output not initialized yet.";
+		error_message(&oss);
+		exit(1);
+	}
+#ifdef DEBUG_OUTPUT
+	oss << "Populating the stk PartVector";
+	sub_progress_message(&oss);
+#endif
+	// populate the list of block parts
+	for(int i = 0 ; i < my_num_elem_blk; ++i)
+	{
+		const string elem_type = my_elem_types.find(my_block_ids[i])->second;
+		oss << "block_" << my_block_ids[i] << "_" << elem_type;
+		const string part_name = oss.str(); oss.str(""); oss.clear();
+		stk::mesh::Part * const part_ptr = part_pointer(mesh, elem_type, part_name);
+		mesh->my_parts.push_back(part_ptr);
+	}
+#ifdef DEBUG_OUTPUT
+	for(int i = 0 ; i < my_num_elem_blk; ++i)
+	{
+		oss << mesh->my_parts[i]->name();
+		sub_sub_progress_message(&oss);
+	}
+#endif
+    mesh->my_metaData.commit(); // this has to be called before we can modify the mesh
+#ifdef DEBUG_OUTPUT
+	oss << "Mesh committed, adding the elements";
+	sub_progress_message(&oss);
+#endif
+	mesh->my_bulkData.modification_begin(); // Begin modifying the mesh
+	int ele_map_index = 0;
+	for(int block = 0 ; block < my_num_elem_blk; ++block)
+	{
+		int * connectivity = my_connectivities.find(my_block_ids[block])->second;
+		const string elem_type = my_elem_types.find(my_block_ids[block])->second;
+		for(int ele = 0 ; ele < my_num_elem_in_block[block]; ++ele)
+		{
+			stk::mesh::EntityId node_ids[ my_num_nodes_per_elem[block] ];
+			stk::mesh::EntityId elem_id = my_elem_map[ele_map_index];
+
+			// Note declare_element expects a cell topology
+			// to have been attached to the part
+			map_node_ids(block,ele,node_ids,elem_type,connectivity);
+#ifdef DEBUG_OUTPUT
+			oss << "ExodusII: ";
+ 			int base = 0;
+			if(elem_type == "QUAD4")
+			{
+				base = ( ele ) * 4 ;
+			}
+			else if(elem_type == "HEX8")
+			{
+				base = ( ele ) * 8 ;
+			}
+			else if (elem_type == "TETRA")
+			{
+				base = ( ele ) * 4 ;
+			}
+			else if (elem_type == "TRI3")
+			{
+				base = ( ele ) * 3 ;
+			}
+			for(int node = 0; node< my_num_nodes_per_elem[block]; ++node)
+			{
+				oss << connectivity[base + node] << ",";
+			}
+			oss << " -> STK mesh: ";
+			for(int node = 0; node< my_num_nodes_per_elem[block]; ++node)
+			{
+				oss << node_ids[node] << ",";
+			}
+			sub_sub_progress_message(&oss);
+#endif
+#ifdef DEBUG_OUTPUT
+	oss << "Adding element id: " << elem_id << " in block " << mesh->my_parts[block]->name();
+	sub_sub_progress_message(&oss);
+#endif
+		    stk::mesh::declare_element(mesh->my_bulkData,*mesh->my_parts[block],elem_id,node_ids);
+			ele_map_index ++;
+		}
+	}
+	// Done modifying the mesh.
+	// Modifications on the local parallel process are communicated
+	// among processes, verified for consistency, and changes to
+	// parallel shared/ghosted mesh entities are synchronized.
+	mesh->my_bulkData.modification_end();
+
+#ifdef DEBUG_OUTPUT
+	oss << "Populating the coordinates field";
+	sub_progress_message(&oss);
+#endif
+    const std::vector<stk::mesh::Bucket*> & node_buckets =
+    		mesh->my_bulkData.buckets(mesh->my_topData.node_rank);
+
+    for ( std::vector<stk::mesh::Bucket*>::const_iterator
+    		node_bucket_it = node_buckets.begin() ;
+    		node_bucket_it != node_buckets.end() ; ++node_bucket_it )
+    {
+    	const stk::mesh::Bucket & bucket = **node_bucket_it;
+#ifdef DEBUG_OUTPUT
+	oss << "Coordinates field for bucket " << bucket.key();
+	sub_sub_progress_message(&oss);
+#endif
+    	// Fill the nodal coordinates.
+    	// Create a multidimensional array view of the
+    	// nodal coordinates field data for this bucket of nodes.
+    	// The array is two dimensional ( Cartesian X NumberNodes )
+    	// and indexed by ( 0..2 , 0..NumerNodes-1 )
+    	stk::mesh::BucketArray<stk::mesh::VectorFieldType> coordinates_array( mesh->my_coordinates_field, bucket );
+    	const int num_sets_of_coords = coordinates_array.dimension(1);  //this is linked to the bucket size
+    	for ( int i=0 ; i < num_sets_of_coords ; ++i )
+    	{
+    		const unsigned node_id = bucket[i].identifier();
+    		map_node_coordinates(node_id,& coordinates_array(0,i),my_num_dim);
+    	}
+    }
+}
+
+void
+Mesh_Manager::map_node_coordinates( stk::mesh::EntityId node_id , double coord[], const int spatial_dim )
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::map_node_coordinates()";
+	oss << "Adding the coordinates field for node " << node_id << " to STK mesh field my_coordinates";
+	progress_message(&oss, method_name);
+#endif
+	if ( node_id < 1 || node_id > my_num_nodes) {
+		oss << "map_node_coordinates(): ERROR, node ("
+				<< node_id << ") must be greater than 0 or less than "<< my_num_nodes << std::endl;
+		error_message(&oss);
+		return;
+	}
+	const unsigned index = node_id - 1;
+	coord[0] = my_x[index];
+	coord[1] = my_y[index];
+	if(spatial_dim > 2)
+		coord[2] = my_z[index];
+}
+
+void
+Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId node_ids[], const string & elem_type, const int * connectivity)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::map_node_ids()";
+	oss << "Converting the ExodusII connectivity for element " << ele << " of block " << block << " to STK mesh. Element type is " << elem_type;
+	progress_message(&oss, method_name);
+#endif
+	if ( ele < 0 || ele >= my_num_elem_in_block[block]) {
+		oss << "map_node_ids(): ERROR, element ("
+				<< ele << ") must be greater than 0 or less than "<< my_num_elem_in_block[block] << std::endl;
+		error_message(&oss);
+		return;
+	}
+
+	if(elem_type == "QUAD4")
+	{
+		const unsigned base = ( ele ) * 4 ;
+		node_ids[0] = connectivity[base + 3] ;
+		node_ids[1] = connectivity[base + 0] ;
+		node_ids[2] = connectivity[base + 1] ;
+		node_ids[3] = connectivity[base + 2] ;
+	}
+	else if(elem_type == "HEX8")
+	{
+		const unsigned base = ( ele ) * 8 ;
+		node_ids[0] = connectivity[base + 1] ;
+		node_ids[1] = connectivity[base + 5] ;
+		node_ids[2] = connectivity[base + 6] ;
+		node_ids[3] = connectivity[base + 2] ;
+		node_ids[4] = connectivity[base + 0] ;
+		node_ids[5] = connectivity[base + 4] ;
+		node_ids[6] = connectivity[base + 7] ;
+		node_ids[7] = connectivity[base + 3] ;
+	}
+	else if (elem_type == "TETRA")
+	{
+		const unsigned base = ( ele ) * 4 ;
+		node_ids[0] = connectivity[base + 0] ;
+		node_ids[1] = connectivity[base + 1] ;
+		node_ids[2] = connectivity[base + 2] ;
+		node_ids[3] = connectivity[base + 3] ;
+	}
+	else if (elem_type == "TRI3")
+	{
+		const unsigned base = ( ele ) * 3 ;
+		node_ids[0] = connectivity[base + 0] ;
+		node_ids[1] = connectivity[base + 1] ;
+		node_ids[2] = connectivity[base + 2] ;
+	}
+	else
+	{
+		oss << "map_node_ids() does not recognize element type: " << elem_type;
+		error_message(&oss);
+		exit(1);
+	}
+}
+
+stk::mesh::Part * const
+Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem_type, const string & name)
+{
+	stringstream oss;
+	stk::mesh::Part * part_ptr;
+
+	if(elem_type == "QUAD4")
+	{
+		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Quadrilateral<4> >(name);
+		part_ptr = &part;
+	}
+	else if(elem_type == "HEX8")
+	{
+		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Hexahedron<8> >(name);
+		part_ptr = &part;
+	}
+	else if (elem_type == "TETRA")
+	{
+		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Tetrahedron<4> >(name);
+		part_ptr = &part;
+	}
+	else if (elem_type == "TRI3")
+	{
+		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Triangle<3> >(name);
+		part_ptr = &part;
+	}
+	else
+	{
+		oss << "part_pointer() does not recognize element type: " << elem_type;
+		error_message(&oss);
+		exit(1);
+	}
+	return part_ptr;
+}
 
 void
 Mesh_Manager::read_mesh()
@@ -33,7 +291,7 @@ Mesh_Manager::read_mesh()
 	if(my_input_exoid<0)
 	{
 		oss << "Reading mesh failure.";
-		sub_progress_message(&oss);
+		error_message(&oss);
 		exit(1);
 	}
 
@@ -46,6 +304,7 @@ Mesh_Manager::read_mesh()
     import_side_sets();
 
     error = ex_close(my_input_exoid);
+    my_input_initialized = true;
 }
 
 void
@@ -173,12 +432,12 @@ Mesh_Manager::import_connectivities()
 				sizeof(int));
 		error = ex_get_elem_conn (my_input_exoid, my_block_ids[i], connectivity);
         my_connectivities.insert(pair<int,int*>(my_block_ids[i],connectivity));
-		// print_connectivity(my_block_ids[i]);
+		//print_connectivity(my_block_ids[i]);
 	}
 }
 
 void
-Mesh_Manager::print_connectivity(int block_id)
+Mesh_Manager::print_connectivity(const int & block_id)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::print_connectivity()";
@@ -299,7 +558,7 @@ Mesh_Manager::import_side_sets()
 }
 
 void
-Mesh_Manager::initialize_output(char * title)
+Mesh_Manager::initialize_output(const char * title)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_output()";
@@ -337,7 +596,7 @@ Mesh_Manager::initialize_output(char * title)
     //	}
     //	error = ex_put_elem_var_tab (my_output_exoid, num_elem_blk, num_ele_vars, truth_tab); free (truth_tab);
 
-    my_output_is_initialized = true;
+    my_output_initialized = true;
 }
 
 void
@@ -527,7 +786,7 @@ Mesh_Manager::write_variable_names()
 }
 
 void
-Mesh_Manager::write_time_step_info(int time_step_num, float time_value)
+Mesh_Manager::write_time_step_info(const int & time_step_num, const float & time_value)
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -537,7 +796,7 @@ Mesh_Manager::write_time_step_info(int time_step_num, float time_value)
 #endif
 	int error;
 
-	if(!my_output_is_initialized)
+	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write time step info to file: " << my_output_file_name;
 		error_message(&oss);
@@ -560,7 +819,7 @@ Mesh_Manager::update_output()
 }
 
 void
-Mesh_Manager::write_global_variables_to_output(int time_step, float time_value, float * global_var_vals)
+Mesh_Manager::write_global_variables_to_output(const int & time_step, const float & time_value, const float * global_var_vals)
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -570,7 +829,7 @@ Mesh_Manager::write_global_variables_to_output(int time_step, float time_value, 
 #endif
 	int error;
 
-	if(!my_output_is_initialized)
+	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write global variables to file: " << my_output_file_name;
 		error_message(&oss);
@@ -580,7 +839,7 @@ Mesh_Manager::write_global_variables_to_output(int time_step, float time_value, 
 }
 
 void
-Mesh_Manager::write_nodal_variable_to_output(int time_step, float time_value, float * nodal_var_vals, int node_var_index)
+Mesh_Manager::write_nodal_variable_to_output(const int & time_step, const float & time_value, const float * nodal_var_vals, const int & node_var_index)
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -590,7 +849,7 @@ Mesh_Manager::write_nodal_variable_to_output(int time_step, float time_value, fl
 #endif
 	int error;
 
-	if(!my_output_is_initialized)
+	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write nodal variables to file: " << my_output_file_name;
 		error_message(&oss);
@@ -599,7 +858,7 @@ Mesh_Manager::write_nodal_variable_to_output(int time_step, float time_value, fl
 }
 
 void
-Mesh_Manager::write_element_variable_to_output(int time_step, float time_value, float * elem_var_vals, int ele_var_index, int block_index)
+Mesh_Manager::write_element_variable_to_output(const int & time_step, const float & time_value, const float * elem_var_vals, const int & ele_var_index, const int & block_index)
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -608,7 +867,7 @@ Mesh_Manager::write_element_variable_to_output(int time_step, float time_value, 
 	progress_message(&oss,method_name);
 #endif
 	int error;
-	if(!my_output_is_initialized)
+	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write variables to file: " << my_output_file_name;
 		error_message(&oss);
@@ -623,216 +882,117 @@ Mesh_Manager::close_output_file()
 	error = ex_close (my_output_exoid);
 }
 
-void
-Mesh_Manager::gregs_output()
+
+template< unsigned NType , unsigned NRel , class field_type >
+bool gather_field_data( const field_type & field ,
+                        const stk::mesh::Entity     & entity ,
+                        typename stk::mesh::FieldTraits< field_type >::data_type * dst,
+                        stk::mesh::EntityRank EType )
 {
-	int exoid, num_dim, num_nodes, num_elem, num_elem_blk;
-	int num_elem_in_block[10], num_nodes_per_elem[10];
-	int num_node_sets, num_sides, num_side_sets, error;
-	int i, j, k, m, *elem_map, *connect;
-	int node_list[100],elem_list[100],side_list[100];
-	int ebids[10], ids[10];
-	int num_sides_per_set[10], num_nodes_per_set[10], num_elem_per_set[10];
-	int num_df_per_set[10];
-	int df_ind[10], node_ind[10], elem_ind[10], side_ind[10];
-	int num_qa_rec, num_info;
-	int num_glo_vars, num_nod_vars, num_ele_vars;
-	int *truth_tab;
-	int whole_time_step, num_time_steps;
-	int ndims, nvars, ngatts, recdim;
-	int CPU_word_size,IO_word_size;
-	int prop_array[2];
-	float *glob_var_vals, *nodal_var_vals, *elem_var_vals;
-	float time_value;
-	float x[100], y[100], z[100], *dummy;
-	float attrib[1], dist_fact[100];
-	char *coord_names[3], *qa_record[2][4], *info[3], *var_names[3];
-	char tmpstr[80];
-	char *prop_names[2];
-	dummy = 0; /* assign this so the Cray compiler doesn’t complain */ /* Specify compute and i/o word size */
-	CPU_word_size = 0;/* float or double */ IO_word_size = 0;/* use system default (4 bytes) */
-	/* create EXODUS II file */
-	exoid = ex_create ("/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/gregs_output.e",/* filename path */ EX_CLOBBER,/* create mode */ &CPU_word_size,/* CPU float word size in bytes */&IO_word_size);/* I/O float word size in bytes */ /* ncopts = NC_VERBOSE; */
-	/* initialize file with parameters */
-	num_dim = 3; num_nodes = 26;
-	num_elem = 5; num_elem_blk = 5; num_node_sets = 2; num_side_sets = 5;
-	error = ex_put_init (exoid, "This is a test", num_dim, num_nodes, num_elem, num_elem_blk, num_node_sets, num_side_sets);
-	/* write nodal coordinates values and names to database */
-	/* Quad #1 */ x[0] = 0.0; y[0] = 0.0; z[0] = 0.0; x[1] = 1.0; y[1] = 0.0; z[1] = 0.0; x[2] = 1.0; y[2] = 1.0; z[2] = 0.0; x[3] = 0.0; y[3] = 1.0; z[3] = 0.0;
-	/* Quad #2 */ x[4] = 1.0; y[4] = 0.0; z[4] = 0.0; x[5] = 2.0; y[5] = 0.0; z[5] = 0.0; x[6] = 2.0; y[6] = 1.0; z[6] = 0.0; x[7] = 1.0; y[7] = 1.0; z[7] = 0.0;
-	/* Hex #1 */ x[8] = 0.0; y[8] = 0.0; z[8] = 0.0; x[9] = 10.0; y[9] = 0.0; z[9] = 0.0; x[10] = 10.0; y[10] = 0.0; z[10] =-10.0; x[11] = 1.0; y[11] = 0.0; z[11] =-10.0; x[12] = 1.0; y[12] = 10.0; z[12] = 0.0; x[13] = 10.0; y[13] = 10.0; z[13] = 0.0; x[14] = 10.0; y[14] = 10.0; z[14] =-10.0; x[15] = 1.0; y[15] = 10.0; z[15] =-10.0;
-	/* Tetra #1 */ x[16] = 0.0; y[16] = 0.0; z[16] = 0.0; x[17] = 1.0; y[17] = 0.0; z[17] = 5.0; x[18] = 10.0; y[18] = 0.0; z[18] = 2.0; x[19] = 7.0; y[19] = 5.0; z[19] = 3.0;
-	/* Wedge #1 */ x[20] = 3.0; y[20] = 0.0; z[20] = 6.0; x[21] = 6.0; y[21] = 0.0; z[21] = 0.0; x[22] = 0.0; y[22] = 0.0; z[22] = 0.0; x[23] = 3.0; y[23] = 2.0; z[23] = 6.0; x[24] = 6.0; y[24] = 2.0; z[24] = 2.0; x[25] = 0.0; y[25] = 2.0; z[25] = 0.0;
-	error = ex_put_coord (exoid, x, y, z);
-	coord_names[0] = (char *)"xcoor"; coord_names[1] = (char *)"ycoor"; coord_names[2] = (char *)"zcoor";
-	error = ex_put_coord_names (exoid, coord_names); /* write element order map */
-	elem_map = (int *) calloc(num_elem, sizeof(int));
-	for (i=1; i<=num_elem; i++) {
-	elem_map[i-1] = i;
-	} error = ex_put_map (exoid, elem_map); free (elem_map);
-	/* write element block parameters */
-	num_elem_in_block[0] = 1;
-	num_elem_in_block[1] = 1;
-	num_elem_in_block[2] = 1;
-	num_elem_in_block[3] = 1;
-	num_elem_in_block[4] = 1;
-	num_nodes_per_elem[0] = 4;
-	/* elements in block #1 are 4-node quads */
-	num_nodes_per_elem[1] = 4;
-	/* elements in block #2 are 4-node quads */
-	num_nodes_per_elem[2] = 8;
-	/* elements in block #3 are 8-node hexes */
-	num_nodes_per_elem[3] = 4;
-	/* elements in block #3 are 4-node tetras */
-	num_nodes_per_elem[4] = 6;
-	/* elements in block #3 are 6-node wedges */
-	ebids[0] = 10; ebids[1] = 11; ebids[2] = 12; ebids[3] = 13; ebids[4] = 14;
-	error = ex_put_elem_block (exoid, ebids[0], (char *)"QUAD", num_elem_in_block[0], num_nodes_per_elem[0], 1);
-	error = ex_put_elem_block (exoid, ebids[1], (char *)"QUAD", num_elem_in_block[1], num_nodes_per_elem[1], 1);
-	error = ex_put_elem_block (exoid, ebids[2], (char *)"HEX", num_elem_in_block[2], num_nodes_per_elem[2], 1);
-	error = ex_put_elem_block (exoid, ebids[3], (char *)"TETRA", num_elem_in_block[3], num_nodes_per_elem[3], 1);
-	error = ex_put_elem_block (exoid, ebids[4], (char *)"WEDGE", num_elem_in_block[4], num_nodes_per_elem[4], 1);
-	/* write element block properties */
-	prop_names[0] = (char *)"TOP"; prop_names[1] = (char *)"RIGHT"; error = ex_put_prop_names(exoid,EX_ELEM_BLOCK,2,prop_names);
-	error = ex_put_prop(exoid, EX_ELEM_BLOCK, ebids[0], (char *)"TOP", 1);
-	error = ex_put_prop(exoid, EX_ELEM_BLOCK, ebids[1], (char *)"TOP", 1);
-	error = ex_put_prop(exoid, EX_ELEM_BLOCK, ebids[2], (char *)"RIGHT", 1);
-	error = ex_put_prop(exoid, EX_ELEM_BLOCK,  ebids[3], (char *)"RIGHT", 1);
-	error = ex_put_prop(exoid, EX_ELEM_BLOCK,ebids[4], (char *)"RIGHT", 1);
-	/* write element connectivity */
+  typedef typename stk::mesh::FieldTraits< field_type >::data_type T ;
 
-	connect = (int *) calloc(8, sizeof(int)); connect[0] = 1; connect[1] = 2; connect[2] = 3; connect[3] = 4;
-	error = ex_put_elem_conn (exoid, ebids[0], connect);
-	connect[0] = 5; connect[1] = 6; connect[2] = 7; connect[3] = 8;
-	error = ex_put_elem_conn (exoid, ebids[1], connect);
-	connect[0] = 9; connect[1] = 10; connect[2] = 11; connect[3] = 12; connect[4] = 13; connect[5] = 14; connect[6] = 15; connect[7] = 16;
-	error = ex_put_elem_conn (exoid, ebids[2], connect);
-	connect[0] = 17; connect[1] = 18; connect[2] = 19; connect[3] = 20;
-	error = ex_put_elem_conn (exoid, ebids[3], connect);
-	connect[0] = 21; connect[1] = 22; connect[2] = 23; connect[3] = 24; connect[4] = 25; connect[5] = 26;
-	error = ex_put_elem_conn (exoid, ebids[4], connect);
-	free (connect);
-	/* write element block attributes */
-	attrib[0] = 3.14159; error = ex_put_elem_attr (exoid, ebids[0], attrib);
-	attrib[0] = 6.14159; error = ex_put_elem_attr (exoid, ebids[1], attrib);
-	error = ex_put_elem_attr (exoid, ebids[2], attrib); error = ex_put_elem_attr (exoid, ebids[3], attrib); error = ex_put_elem_attr (exoid, ebids[4], attrib);
-	/* write individual node sets */ error = ex_put_node_set_param (exoid, 20, 5, 5);
-	node_list[0] = 100; node_list[1] = 101; node_list[2] = 102; node_list[3] = 103; node_list[4] = 104;
-	dist_fact[0] = 1.0; dist_fact[1] = 2.0; dist_fact[2] = 3.0; dist_fact[3] = 4.0; dist_fact[4] = 5.0;
-	error = ex_put_node_set (exoid, 20, node_list); error = ex_put_node_set_dist_fact (exoid, 20, dist_fact);
-	error = ex_put_node_set_param (exoid, 21, 3, 3);
-	node_list[0] = 200; node_list[1] = 201; node_list[2] = 202;
-	dist_fact[0] = 1.1; dist_fact[1] = 2.1; dist_fact[2] = 3.1;
-	error = ex_put_node_set (exoid, 21, node_list); error = ex_put_node_set_dist_fact (exoid, 21, dist_fact);
-	error = ex_put_prop(exoid, EX_NODE_SET, 20, (char *)"FACE", 4); error = ex_put_prop(exoid, EX_NODE_SET, 21, (char *)"FACE", 5);
-	prop_array[0] = 1000; prop_array[1] = 2000;
-	error = ex_put_prop_array(exoid, EX_NODE_SET, (char *)"VELOCITY", prop_array);
+  stk::mesh::PairIterRelation rel = entity.relations( EType );
 
-	/* write individual side sets */
-	/* side set #1 - quad */
-	error = ex_put_side_set_param (exoid, 30, 2, 4);
-	elem_list[0] = 2; elem_list[1] = 2;
-	side_list[0] = 4; side_list[1] = 2;
-	dist_fact[0] = 30.0; dist_fact[1] = 30.1; dist_fact[2] = 30.2; dist_fact[3] = 30.3;
-	error = ex_put_side_set (exoid, 30, elem_list, side_list); error = ex_put_side_set_dist_fact (exoid, 30, dist_fact); /* side set #2 - quad, spanning 2 elements */ error = ex_put_side_set_param (exoid, 31, 2, 4); elem_list[0] = 1; elem_list[1] = 2;
-	side_list[0] = 2; side_list[1] = 3;
-	dist_fact[0] = 31.0; dist_fact[1] = 31.1; dist_fact[2] = 31.2; dist_fact[3] = 31.3;
-	error = ex_put_side_set (exoid, 31, elem_list, side_list); error = ex_put_side_set_dist_fact (exoid, 31, dist_fact); /* side set #3 - hex */ error = ex_put_side_set_param (exoid, 32, 7, 0);
-	elem_list[0] = 3; elem_list[2] = 3; elem_list[4] = 3; elem_list[6] = 3;
-	side_list[0] = 5; side_list[2] = 3; side_list[4] = 4; side_list[6] = 6;
-	elem_list[1] = 3; elem_list[3] = 3; elem_list[5] = 3;
-	side_list[1] = 3; side_list[3] = 2; side_list[5] = 1;
-	error = ex_put_side_set (exoid, 32,	elem_list, side_list);
-	/* side set #4 - tetras */
-	error = ex_put_side_set_param (exoid, 33, 4, 0);
-	elem_list[0] = 4; elem_list[1] = 4; elem_list[2] = 4; elem_list[3] = 4;
-	side_list[0] = 1; side_list[1] = 2; side_list[2] = 3; side_list[3] = 4;
-	error = ex_put_side_set (exoid, 33, 	elem_list, side_list);
-	/* side set #5 - wedges */
-	error = ex_put_side_set_param (exoid, 34, 5, 0);
+  bool result = NRel == (unsigned) rel.size();
 
-	elem_list[0] = 5; elem_list[2] = 5; elem_list[4] = 5;
-	side_list[0] = 1; side_list[2] = 3; side_list[4] = 5;
-	elem_list[1] = 5; elem_list[3] = 5;
-	side_list[1] = 2; side_list[3] = 4;
-	error = ex_put_side_set (exoid, 34,elem_list, side_list);
-
-
-	error = ex_put_prop(exoid, EX_SIDE_SET, 30, (char *)"COLOR", 100);
-	error = ex_put_prop(exoid, EX_SIDE_SET, 31, (char *)"COLOR", 101); /* write QA records */
-	num_qa_rec = 2;
-	qa_record[0][0] = (char *)"TESTWT";
-	qa_record[0][1] = (char *)"testwt";
-	qa_record[0][2] = (char *)"07/07/93";
-	qa_record[0][3] = (char *)"15:41:33";
-	qa_record[1][0]  = (char *)"FASTQ";
-	qa_record[1][1] = (char *)"fastq";
-	qa_record[1][2] = (char *)"07/07/93";
-	qa_record[1][3] = (char *)"16:41:33";
-
-	error = ex_put_qa (exoid, num_qa_rec, qa_record); /* write information records */
-	num_info = 3;
-	info[0] = (char *)"This is the first information record."; info[1] = (char *)"This is the second information record."; info[2] = (char *)"This is the third information record.";
-	error = ex_put_info (exoid, num_info, info); /* write results variables parameters and names */
-	num_glo_vars = 1;
-	var_names[0] = (char *)"glo_vars";
-	error = ex_put_var_param (exoid, "g", num_glo_vars);
-	error = ex_put_var_names (exoid, "g",num_glo_vars, var_names);
-	num_nod_vars = 2;
-	var_names[0] = (char *)"nod_var0";
-	var_names[1] = (char *)"nod_var1";
-	error = ex_put_var_param (exoid, "n", num_nod_vars);
-	error = ex_put_var_names (exoid, "n",num_nod_vars, var_names);
-	num_ele_vars = 3;
-	var_names[0] = (char *)"ele_var0";
-	var_names[1] = (char *)"ele_var1";
-	var_names[2] = (char *)"ele_var2";
-	error = ex_put_var_param (exoid, "e", num_ele_vars);
-	error = ex_put_var_names (exoid, "e",num_ele_vars, var_names);
-
-
-	/* write element variable truth table */ truth_tab = (int *) calloc ((num_elem_blk*num_ele_vars), sizeof(int));
-	k = 0; for (i=0; i<num_elem_blk; i++) {
-	for (j=0; j<num_ele_vars; j++) {
-	}
-	truth_tab[k++] = 1;
-	} error = ex_put_elem_var_tab (exoid, num_elem_blk, num_ele_vars, truth_tab); free (truth_tab);
-	/* for each time step, write the analysis results; * the code below fills the arrays glob_var_vals,
-	D-8
-	* nodal_var_vals, and elem_var_vals with values for debugging purposes; * obviously the analysis code will populate these arrays */
-	whole_time_step = 1; num_time_steps = 10;
-	glob_var_vals = (float *) calloc (num_glo_vars, CPU_word_size);
-	nodal_var_vals = (float *) calloc (num_nodes, CPU_word_size);
-	elem_var_vals = (float *) calloc (4, CPU_word_size);
-	for (i=0; i<num_time_steps; i++) {
-		time_value = (float)(i+1)/100.; /* write time value */
-		error = ex_put_time (exoid, whole_time_step, &time_value); /* write global variables */
-		for (j=0; j<num_glo_vars; j++) {
-			glob_var_vals[j] = (float)(j+2) * time_value;
-		}
-		error = ex_put_glob_vars (exoid, whole_time_step, num_glo_vars, glob_var_vals);
-		/* write nodal variables */
-		for (k=1; k<=num_nod_vars; k++) {
-			for (j=0; j<num_nodes; j++) {
-				nodal_var_vals[j] = (float)k + ((float)(j+1) * time_value);
-			}
-			error = ex_put_nodal_var (exoid, whole_time_step, k, num_nodes, nodal_var_vals);
-		} /* write element variables */
-		for (k=1; k<=num_ele_vars; k++) {
-			for (j=0; j<num_elem_blk; j++) {
-				for (m=0; m<num_elem_in_block[j]; m++) {
-					elem_var_vals[m] = (float)(k+1) + (float)(j+2) + ((float)(m+1)*time_value);
-				}
-				error = ex_put_elem_var (exoid, whole_time_step, k, ebids[j],	num_elem_in_block[j], elem_var_vals);
-			}
-		}
-		whole_time_step++;
-		/* update the data file; this should be done at the end of every time step * to ensure that no data is lost if the analysis dies */
-		error = ex_update (exoid);
-	}
-	free(glob_var_vals); free(nodal_var_vals); free(elem_var_vals);
-
-	/* close the EXODUS files */
-	error = ex_close (exoid);
+  if ( result ) {
+    T * const dst_end = dst + NType * NRel ;
+    for ( const T * src ;
+          ( dst < dst_end ) &&
+          ( src = field_data( field , * rel->entity() ) ) ;
+          ++rel , dst += NType ) {
+      stk::Copy<NType>( dst , src );
+    }
+    result = dst == dst_end ;
+  }
+  return result ;
 }
+
+bool
+Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::verify_coordinates_field()";
+	oss << "Verifying the coordinates in the STK mesh...";
+	progress_message(&oss,method_name);
+#endif
+
+  bool result = true;
+
+  const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
+  const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
+  const stk::mesh::TopologicalMetaData & topData = mesh.my_topData;
+
+  // All element buckets:
+  const std::vector<stk::mesh::Bucket*> & elem_buckets =
+    bulkData.buckets( topData.element_rank );
+
+  // Verify coordinates_field by gathering the nodal coordinates
+  // from each element's nodes.
+  for ( std::vector<stk::mesh::Bucket*>::const_iterator
+        element_bucket_it = elem_buckets.begin();
+        element_bucket_it != elem_buckets.end() ; ++element_bucket_it ) {
+
+    const stk::mesh::Bucket& bucket = **element_bucket_it;
+    const size_t num_buckets = bucket.size();
+
+    for( size_t bucket_index = 0; bucket_index < num_buckets; ++bucket_index) {
+      const stk::mesh::Entity & elem = bucket[bucket_index] ;
+#ifdef DEBUG_OUTPUT
+      oss << "Element " << elem.identifier();
+      sub_sub_progress_message(&oss);
+#endif
+      const char * topo_name = mesh.my_topData.get_cell_topology(bucket)->name;
+      oss << topo_name;
+      const string topo_str = oss.str(); oss.str(""); oss.clear();
+      const int num_nodes = mesh.my_topData.get_cell_topology(bucket)->node_count;
+      const int & dim = mesh.my_spatial_dimension;
+      double elem_coord[ num_nodes ][ dim ];
+
+      if(topo_str == "Quadrilateral_4")
+      {
+    	  result = gather_field_data< shards::Quadrilateral<4>::dimension , shards::Quadrilateral<4>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
+      }
+      else if(topo_str == "Hexahedron_8")
+      {
+    	  result = gather_field_data< shards::Hexahedron<8>::dimension , shards::Hexahedron<8>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
+      }
+      else if (topo_str == "Triangle_3")
+      {
+    	  result = gather_field_data< shards::Triangle<3>::dimension , shards::Triangle<3>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
+      }
+      else if (topo_str == "Tetrahedron_4")
+      {
+    	  result = gather_field_data< shards::Tetrahedron<4>::dimension , shards::Tetrahedron<4>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
+      }
+      else
+      {
+    	  oss << "verify_coordinates_field() does not recognize element type: " << topo_name;
+    	  error_message(&oss);
+    	  exit(1);
+      }
+
+      if ( result == false ) {
+    	  oss << "verify_coordinates_field() gather was not successful";
+    	  error_message(&oss);
+    	  exit(1);
+      }
+#ifdef DEBUG_OUTPUT
+      for (int node_index=0 ; node_index<num_nodes ; ++node_index )
+      {
+    	  cout << "                   node " << node_index + 1 << ": ";
+    	  for (int coord_index=0 ; coord_index<dim ; ++coord_index) {
+    		  cout << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
+    	  }
+    	  cout << endl;
+      }
+#endif
+    }
+  }
+
+  return result;
+}
+
+
 

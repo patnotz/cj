@@ -4,6 +4,7 @@ SET(SOURCES
 	cj_main.cpp
 	messages.cpp 
 	mesh_manager.cpp
+	stk_mesh.cpp
   )
 
 SET(HEADERS
