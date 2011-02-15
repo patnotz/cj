@@ -5,6 +5,7 @@
  *      Author: dzturne1
  */
 
+#include <stdlib.h>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -732,7 +733,7 @@ Mesh_Manager::gregs_output()
 	dummy = 0; /* assign this so the Cray compiler doesn’t complain */ /* Specify compute and i/o word size */
 	CPU_word_size = 0;/* float or double */ IO_word_size = 0;/* use system default (4 bytes) */
 	/* create EXODUS II file */
-	exoid = ex_create ("/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/gregs_output.e",/* filename path */ EX_CLOBBER,/* create mode */ &CPU_word_size,/* CPU float word size in bytes */&IO_word_size);/* I/O float word size in bytes */ /* ncopts = NC_VERBOSE; */
+	exoid = ex_create ("gregs_output.e",/* filename path */ EX_CLOBBER,/* create mode */ &CPU_word_size,/* CPU float word size in bytes */&IO_word_size);/* I/O float word size in bytes */ /* ncopts = NC_VERBOSE; */
 	/* initialize file with parameters */
 	num_dim = 3; num_nodes = 26;
 	num_elem = 5; num_elem_blk = 5; num_node_sets = 2; num_side_sets = 5;

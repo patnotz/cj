@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <iostream>
 #include <../include/mesh_manager.h>
 #include <../include/messages.h>
@@ -13,8 +14,8 @@ int main()
 	start_message();
 
 	// This information is hard coded for now, until we have an input reader:
-	char* mesh_input_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.g";
-	char* mesh_output_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.e";
+	char* mesh_input_file_name = (char*)"mesh.g";
+	char* mesh_output_file_name = (char*)"mesh.e";
 
 	Mesh_Manager mesh_manager;
 	mesh_manager.set_input_file(mesh_input_file_name);
