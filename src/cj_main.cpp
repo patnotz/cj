@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <iostream>
-#include <../include/mesh_manager.h>
-#include <../include/messages.h>
+#include <mesh_manager.h>
+#include <messages.h>
 
 //#include "exodusII.h"
 //#include "netcdf.h"
