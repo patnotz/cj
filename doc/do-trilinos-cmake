@@ -1,0 +1,86 @@
+#!/bin/bash
+
+EXTRA_ARGS=$@
+
+rm -f CMakeCache.txt
+
+cmake \
+      -D CMAKE_INSTALL_PREFIX:PATH=/usr/local/trilinos-master/mpi/opt \
+      -D CMAKE_BUILD_TYPE:STRING=NONE \
+      -D CMAKE_CXX_COMPILER:STRING=/usr/local/bin/mpic++ \
+      -D CMAKE_C_COMPILER:STRING=/usr/local/bin/mpicc \
+      -D CMAKE_EXE_LINKER_FLAGS:STRING="-L/opt/local/lib -lcurl -lhdf5 -lhdf5_hl" \
+      -D Trilinos_ENABLE_Fortran:BOOL=OFF \
+      -D Trilinos_WARNINGS_AS_ERRORS_FLAGS:STRING="" \
+      -D Trilinos_ENABLE_ALL_PACKAGES:BOOL=OFF \
+      -D Trilinos_ENABLE_ALL_OPTIONAL_PACKAGES:BOOL=OFF \
+\
+      -D Trilinos_ENABLE_Teuchos:BOOL=ON \
+      -D Trilinos_ENABLE_Shards:BOOL=ON \
+      -D Trilinos_ENABLE_Sacado:BOOL=ON \
+      -D Trilinos_ENABLE_Epetra:BOOL=ON \
+      -D Trilinos_ENABLE_EpetraExt:BOOL=ON \
+      -D Trilinos_ENABLE_Ifpack:BOOL=ON \
+      -D Trilinos_ENABLE_AztecOO:BOOL=ON \
+      -D Trilinos_ENABLE_Amesos:BOOL=ON \
+      -D Trilinos_ENABLE_Anasazi:BOOL=ON \
+      -D Trilinos_ENABLE_Belos:BOOL=ON \
+      -D Trilinos_ENABLE_ML:BOOL=ON \
+      -D Trilinos_ENABLE_Phalanx:BOOL=ON \
+      -D Trilinos_ENABLE_Intrepid:BOOL=ON \
+      -D Trilinos_ENABLE_NOX:BOOL=ON \
+      -D Trilinos_ENABLE_Stratimikos:BOOL=ON \
+      -D Trilinos_ENABLE_Thyra:BOOL=ON \
+      -D Trilinos_ENABLE_Rythmos:BOOL=ON \
+      -D Trilinos_ENABLE_MOOCHO:BOOL=ON \
+      -D Trilinos_ENABLE_OptiPack:BOOL=ON \
+      -D Trilinos_ENABLE_GlobiPack:BOOL=ON \
+      -D Trilinos_ENABLE_Stokhos:BOOL=ON \
+      -D Trilinos_ENABLE_Isorropia:BOOL=ON\
+      -D Trilinos_ENABLE_Piro:BOOL=ON \
+      -D Trilinos_ENABLE_STK:BOOL=ON \
+      -D Trilinos_ENABLE_Teko:BOOL=ON \
+      -D Trilinos_ENABLE_FEI:BOOL=ON\
+      -D Trilinos_ENABLE_Zoltan:BOOL=ON\
+      -D Trilinos_ENABLE_Mesquite:BOOL=ON\
+\
+      -D Trilinos_ENABLE_TESTS:BOOL=OFF \
+      -D Trilinos_ENABLE_EXAMPLES:BOOL=OFF \
+      -D TPL_ENABLE_MPI:BOOL=ON \
+      -D MPI_BASE_DIR:PATH=/opt/local/ \
+      -D TPL_ENABLE_Boost:BOOL=ON \
+\
+      -D Phalanx_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
+      -D Stokhos_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
+      -D Stratimikos_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
+\
+      -D CMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+      -D Trilinos_ENABLE_Export_Makefiles:BOOL=ON \
+\
+      -D Trilinos_ENABLE_Trios:BOOL=ON \
+      -D Trilinos_ENABLE_Pamgen:BOOL=ON \
+      -D Trios_ENABLE_XDMF:BOOL=OFF \
+      -D TPL_ENABLE_Netcdf:BOOL=ON \
+      -D TPL_Netcdf_INCLUDE_DIRS:PATH=/opt/local/include \
+      -D Netcdf_LIBRARY_DIRS:PATH=/opt/local/lib \
+      $EXTRA_ARGS \
+       ../
+
+#
+# Optional build capabilities:
+# (1) TriKota is a Trilinos package that builds the
+#     Dakota libraries, for optimization and UQ. See
+#     TriKota web page for how to unpack Dakota.
+#
+#        -D Trilinos_ENABLE_TriKota:BOOL=ON \
+#
+# (2) These 6 lines regarding  Trios/netcdf  are needed
+#     for reading exodus meshes, but require an
+#     installed netcdf. Also used for Pamgen meshes.
+#        -D Trilinos_ENABLE_Trios:BOOL=ON \
+#        -D Trilinos_ENABLE_Pamgen:BOOL=ON \
+#        -D Trios_ENABLE_XDMF:BOOL=OFF \
+#        -D TPL_ENABLE_Netcdf:BOOL=ON \
+#        -D TPL_Netcdf_INCLUDE_DIRS:PATH=/home/agsalin/install/netcdf-4.0.1/include \
+#        -D Netcdf_LIBRARY_DIRS:PATH=/home/agsalin/install/netcdf-4.0.1/lib \
+

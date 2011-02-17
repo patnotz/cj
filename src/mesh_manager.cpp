@@ -5,20 +5,19 @@
  *      Author: dzturne1
  */
 
+#include <stdlib.h>
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <time.h>
 
-#include <../include/mesh_manager.h>
-#include <../include/messages.h>
-#include <../include/main.h>
-#include <../include/stk_mesh.h>
-#include <stk_mesh/fem/TopologyHelpers.hpp>
+#include <mesh_manager.h>
+#include <messages.h>
 #include <stk_mesh/base/FieldData.hpp>
+#include <stk_mesh/fem/TopologyHelpers.hpp>
 
-#include "exodusII.h"
-#include "netcdf.h"
+#include <exodusII.h>
+#include <netcdf.h>
 
 using namespace std;
 

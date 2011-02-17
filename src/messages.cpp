@@ -7,7 +7,7 @@
 #include <string>
 #include <sstream>
 #include <time.h>
-#include <../include/messages.h>
+#include <messages.h>
 
 using namespace std;
 

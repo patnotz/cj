@@ -1,8 +1,7 @@
+#include <stdlib.h>
 #include <iostream>
-#include <../include/main.h>
-#include <../include/mesh_manager.h>
-#include <../include/messages.h>
-#include <../include/stk_mesh.h>
+#include <mesh_manager.h>
+#include <messages.h>
 
 using namespace std;
 
@@ -11,8 +10,8 @@ int main( int argc, char * argv[] )
 	start_message();
 
 	// This information is hard coded for now, until we have an input reader:
-	const char* mesh_input_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.g";
-	const char* mesh_output_file_name = (char*)"/Users/dzturne1/Documents/dzturne1/Research/cj/problems/unit_2d/mesh.e";
+	char* mesh_input_file_name = (char*)"mesh.g";
+	char* mesh_output_file_name = (char*)"mesh.e";
 
 	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name);
 	mesh_manager.read_mesh();
