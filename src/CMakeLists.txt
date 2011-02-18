@@ -23,4 +23,12 @@ add_library(cjLib ${SOURCES} ${HEADERS})
 
 add_executable(Cj cj_main.cpp)
 
-target_link_libraries(Cj          cjLib ${ALB_TRILINOS_LIBS} ${ALB_CUBIT_LIBS}) 
+target_link_libraries(Cj cjLib) 
+target_link_libraries(Cj stk_io) 
+target_link_libraries(Cj stk_mesh_base) 
+target_link_libraries(Cj stk_mesh_fem) 
+target_link_libraries(Cj stk_util_diag) 
+target_link_libraries(Cj stk_util_env) 
+target_link_libraries(Cj stk_util_parallel) 
+target_link_libraries(Cj stk_util_util) 
+target_link_libraries(Cj shards) 
