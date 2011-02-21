@@ -4,7 +4,7 @@
  *  Created on: Feb 6, 2011
  *      Author: dzturne1
  */
-#include <../include/stk_mesh.h>
+#include <stk_mesh.h>
 
 namespace stk {
 namespace mesh {

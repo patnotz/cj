@@ -10,7 +10,7 @@
 
 #include "exodusII.h"
 
-#include <../include/stk_mesh.h>
+#include <stk_mesh.h>
 
 #ifndef MESH_MANAGER_H_
 #define MESH_MANAGER_H_
