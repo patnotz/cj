@@ -4,7 +4,6 @@
  *  Created on: Feb 6, 2011
  *      Author: dzturne1
  */
-
 #ifndef STK_MESH_H_
 #define STK_MESH_H_
 
@@ -17,7 +16,6 @@
 #include <stk_mesh/base/Field.hpp>
 #include <stk_mesh/fem/CoordinateSystems.hpp>
 #include <stk_mesh/fem/TopologicalMetaData.hpp>
-
 
 enum { field_data_chunk_size = 10 };
 

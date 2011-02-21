@@ -5,19 +5,18 @@
  *      Author: dzturne1
  */
 
-#include <iostream>
-
 #ifndef MESSAGES_H_
 #define MESSAGES_H_
 
-using namespace std;
+#include <iostream>
+#include <string>
 
 void start_message();
 void success_message();
-void progress_message(stringstream * oss, string & name);
-void sub_progress_message(stringstream * oss);
-void sub_sub_progress_message(stringstream * oss);
-void error_message(stringstream * oss);
-void printStatus(bool status, stringstream * oss);
+void progress_message(std::stringstream * oss, std::string & name);
+void sub_progress_message(std::stringstream * oss);
+void sub_sub_progress_message(std::stringstream * oss);
+void error_message(std::stringstream * oss);
+void printStatus(bool status, std::stringstream * oss);
 
 #endif /* MESSAGES_H_ */
