@@ -12,67 +12,73 @@
 using namespace std;
 
 void
-start_message()
+start_message(Log & log)
 {
-	cout << endl << endl << "  CODE NAME, please don't call me cj" << endl << endl <<
+	log << endl << endl << "  CODE NAME, please don't call me cj" << endl << endl <<
 			"  Authors: PK Notz, DZ Turner" << endl << endl;
-	cout << "  Version: 1.0" << endl;
+	log << "  Version: 1.0" << endl;
 	struct tm *current;
 	time_t now;
 	time(&now);
 	current = localtime(&now);
 	int year = current->tm_year + 1900;
 	int month = current->tm_mon + 1;
-	cout << "  Date:    " << month << "/" <<  current->tm_mday << "/" << year << endl;
-	printf("  Time:    %i:%i:%i\n", current->tm_hour, current->tm_min, current->tm_sec);
+	log << "  Date:    "
+			<< month << "/"
+			<<  current->tm_mday << "/"
+			<< year << endl;
+  log << "  Time:    "
+  		<< current->tm_hour << ":"
+  		<< current->tm_min << ":"
+  		<< current->tm_sec << endl;
 }
 
 void
-success_message()
+success_message(Log & log)
 {
-	cout << endl << "  %    Simulation completed successfully    %" << endl;
+	log << endl << "  %    Simulation completed successfully    %" << endl;
 }
 
 
 void
-progress_message(stringstream * oss, string & name)
+progress_message(Log & log, stringstream * oss, string & name)
 {
 	string message = oss->str();
-	cout << endl << "%  " << name  << endl  << "        " <<  message << endl;
+	log << endl << "%  " << name  << endl  << "        " <<  message << endl;
 	oss->str(""); oss->clear();
 }
 void
-sub_progress_message(stringstream * oss)
+sub_progress_message(Log & log, stringstream * oss)
 {
 	string message = oss->str();
-	cout << "             " << message << endl;
+	log << "             " << message << endl;
 	oss->str(""); oss->clear();
 }
 void
-sub_sub_progress_message(stringstream * oss)
+sub_sub_progress_message(Log & log, stringstream * oss)
 {
 	string message = oss->str();
-	cout << "                   " << message << endl;
-	oss->str(""); oss->clear();
-}
-
-void
-error_message(stringstream * oss)
-{
-	string message = oss->str();
-	std::cerr << "% ERROR % " << message << endl;
+	log << "                   " << message << endl;
 	oss->str(""); oss->clear();
 }
 
 void
-printStatus(bool status, stringstream * oss)
+error_message(Log & log, stringstream * oss)
+{
+	string message = oss->str();
+	log << "% ERROR % " << message << endl;
+	oss->str(""); oss->clear();
+}
+
+void
+printStatus(Log & log, bool status, stringstream * oss)
 {
 	string message = oss->str();
   if (status) {
-    cout << "  " << message << " [ PASSED ]" << std::endl;
+    log << "  " << message << " [ PASSED ]" << endl;
   }
   else {
-    cout << "  " << message << "[ FAILED ]" << std::endl;
+    log << "  " << message << "[ FAILED ]" << endl;
   }
 	oss->str(""); oss->clear();
 }

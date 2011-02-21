@@ -1,6 +1,8 @@
 #ifndef DRIVE_SIMULATION_H_
 #define DRIVE_SIMULATION_H_
 
-int drive_simulation( int argc, char * argv[] );
+#include <log.h>
+
+int drive_simulation(Log & log, int argc, char * argv[] );
 
 #endif /* DRIVE_SIMULATION_H_ */

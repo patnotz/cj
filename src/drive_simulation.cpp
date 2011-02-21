@@ -3,12 +3,13 @@
 #include <mesh_manager.h>
 #include <messages.h>
 #include <drive_simulation.h>
+#include <log.h>
 
 using namespace std;
 
-int drive_simulation( int argc, char * argv[] )
+int drive_simulation(Log & log, int argc, char * argv[] )
 {
-	start_message();
+	start_message(log);
 
 	// This information is hard coded for now, until we have an input reader:
 	char* mesh_input_file_name = (char*)"mesh.g";
@@ -26,7 +27,7 @@ int drive_simulation( int argc, char * argv[] )
     local_status = mesh_manager.verify_coordinates_field(stk_mesh);
     stringstream oss;
     oss << "Verifying the STK mesh coordinates field: ";
-    printStatus(local_status, &oss);
+    printStatus(log, local_status, &oss);
 
 	//  CREATE BOGUS FIELDS FOR NOW the following is not linked to stk mesh stuff above yet
 
@@ -98,7 +99,7 @@ int drive_simulation( int argc, char * argv[] )
 
     mesh_manager.close_output_file();
 
-	success_message();
+	success_message(log);
 
 	return 0;
 }

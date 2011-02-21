@@ -1,9 +1,11 @@
-#include <drive_simulation.h>
+#include <iostream>
 
-using namespace std;
+#include <drive_simulation.h>
+#include <log.h>
 
 int main( int argc, char * argv[] )
 {
-	const int error_code = drive_simulation(argc, argv);
+	Log & log = std::cout;
+	const int error_code = drive_simulation(log, argc, argv);
 	return error_code;
 }
