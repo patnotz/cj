@@ -2,6 +2,7 @@
 #
 SET(SOURCES
 	cj_main.cpp
+	drive_simulation.cpp
 	messages.cpp 
 	mesh_manager.cpp
 	stk_mesh.cpp
