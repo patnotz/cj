@@ -21,16 +21,19 @@ protected:
 	void closeEvent(QCloseEvent * event);
 
 private slots:
-	void openInputMesh();
+  void openInputMesh();
 	void openOutputMesh();
 	void run();
 
 private:
+	void createWidgets();
 	void createActions();
 	void createMenus();
 	void createContextMenu();
 	void createToolBars();
 	void createStatusBar();
+
+	QWidget *centralWidget;
 
 	QLabel *inputMeshLabel;
 	QLineEdit *inputMeshLineEdit;

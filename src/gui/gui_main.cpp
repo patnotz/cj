@@ -11,6 +11,8 @@ int main( int argc, char * argv[] )
 
 	MainWindow mainWindow;
 	mainWindow.show();
+	mainWindow.raise();
+	mainWindow.activateWindow();
 
 	//QString fileName = QFileDialog::getOpenFileName(0,"Open", ".");
 
