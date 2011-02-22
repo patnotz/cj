@@ -9,7 +9,7 @@ cmake \
       -D CMAKE_BUILD_TYPE:STRING=NONE \
       -D CMAKE_CXX_COMPILER:STRING=/usr/local/bin/mpic++ \
       -D CMAKE_C_COMPILER:STRING=/usr/local/bin/mpicc \
-      -D CMAKE_EXE_LINKER_FLAGS:STRING="-L/opt/local/lib -lcurl -lhdf5 -lhdf5_hl" \
+      -D CMAKE_EXE_LINKER_FLAGS:STRING="-L/opt/local/lib -lcurl -lhdf5 -lhdf5_hl -lz" \
       -D Trilinos_ENABLE_Fortran:BOOL=OFF \
       -D Trilinos_WARNINGS_AS_ERRORS_FLAGS:STRING="" \
       -D Trilinos_ENABLE_ALL_PACKAGES:BOOL=OFF \

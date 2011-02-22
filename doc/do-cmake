@@ -8,6 +8,6 @@ cmake \
  -D CMAKE_VERBOSE_MAKEFILE:BOOL=ON \
  -D CMAKE_CXX_COMPILER:STRING=/usr/local/bin/mpic++ \
  -D CMAKE_C_COMPILER:STRING=/usr/local/bin/mpicc \
- -D CMAKE_EXE_LINKER_FLAGS:STRING="-L/opt/local/lib -lcurl -lhdf5 -lhdf5_hl -lexodus -lnetcdf" \
- -D CJ_TRILINOS_DIR:FILEPATH=/usr/local/trilinos-10.6.2/mpi/opt \
+ -D CMAKE_EXE_LINKER_FLAGS:STRING="-L/opt/local/lib -lcurl -lhdf5 -lhdf5_hl -lexodus -lnetcdf -lz" \
+ -D CJ_TRILINOS_DIR:FILEPATH=/usr/local/trilinos-master/mpi/opt \
  $EXTRA_ARGS ..
