@@ -20,10 +20,8 @@ public:
 	~Mesh_Manager();
 
 	void populate_STK_mesh(stk::mesh::STK_Mesh * const mesh);
-	stk::mesh::Part * const part_pointer(
-			stk::mesh::STK_Mesh * const mesh,
-			const std::string & elem_type,
-			const std::string & name);
+	stk::mesh::Part * const
+	part_pointer(stk::mesh::STK_Mesh * const mesh, const std::string & elem_type, const std::string & name);
 	void map_node_ids(
 			const int block,
 			const int ele,

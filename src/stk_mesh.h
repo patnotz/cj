@@ -15,7 +15,8 @@
 #include <stk_mesh/base/BulkData.hpp>
 #include <stk_mesh/base/Field.hpp>
 #include <stk_mesh/fem/CoordinateSystems.hpp>
-#include <stk_mesh/fem/TopologicalMetaData.hpp>
+#include <stk_mesh/fem/DefaultFEM.hpp>
+#include <stk_mesh/fem/TopologyHelpers.hpp>
 
 enum { field_data_chunk_size = 10 };
 
@@ -35,7 +36,7 @@ public:
   const int                      my_spatial_dimension;
   stk::mesh::MetaData            my_metaData;
   stk::mesh::BulkData            my_bulkData;
-  stk::mesh::TopologicalMetaData my_topData;
+  stk::mesh::DefaultFEM          my_fem;
   PartVector my_parts;
   VectorFieldType &              my_coordinates_field;
 //  ScalarFieldType &              my_volume_field;

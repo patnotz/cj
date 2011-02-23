@@ -13,11 +13,17 @@
 
 #include <mesh_manager.h>
 #include <messages.h>
+#include <stk_mesh/base/MetaData.hpp>
 #include <stk_mesh/base/FieldData.hpp>
 #include <stk_mesh/fem/TopologyHelpers.hpp>
+#include <stk_mesh/fem/FEMInterface.hpp>
+
+#include <Shards_CellTopologyData.h>
 
 #include <exodusII.h>
 #include <netcdf.h>
+
+using stk::mesh::fem::NODE_RANK;
 
 using namespace std;
 
@@ -56,7 +62,8 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 		const string elem_type = my_elem_types.find(my_block_ids[i])->second;
 		oss << "block_" << my_block_ids[i] << "_" << elem_type;
 		const string part_name = oss.str(); oss.str(""); oss.clear();
-		stk::mesh::Part * const part_ptr = part_pointer(mesh, elem_type, part_name);
+
+		stk::mesh::Part * part_ptr = part_pointer(mesh, elem_type, part_name);
 		mesh->my_parts.push_back(part_ptr);
 	}
 #ifdef DEBUG_OUTPUT
@@ -134,7 +141,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	sub_progress_message(&oss);
 #endif
     const std::vector<stk::mesh::Bucket*> & node_buckets =
-    		mesh->my_bulkData.buckets(mesh->my_topData.node_rank);
+    		mesh->my_bulkData.buckets(NODE_RANK);
 
     for ( std::vector<stk::mesh::Bucket*>::const_iterator
     		node_bucket_it = node_buckets.begin() ;
@@ -249,22 +256,22 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem
 
 	if(elem_type == "QUAD4")
 	{
-		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Quadrilateral<4> >(name);
+		stk::mesh::Part & part = stk::mesh::declare_part<shards::Quadrilateral<4> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
 	else if(elem_type == "HEX8")
 	{
-		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Hexahedron<8> >(name);
+		stk::mesh::Part & part = stk::mesh::declare_part<shards::Hexahedron<8> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
 	else if (elem_type == "TETRA")
 	{
-		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Tetrahedron<4> >(name);
+		stk::mesh::Part & part = stk::mesh::declare_part<shards::Tetrahedron<4> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
 	else if (elem_type == "TRI3")
 	{
-		stk::mesh::Part & part = mesh->my_topData.declare_part<shards::Triangle<3> >(name);
+		stk::mesh::Part & part = stk::mesh::declare_part<shards::Triangle<3> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
 	else
@@ -881,31 +888,41 @@ Mesh_Manager::close_output_file()
 	error = ex_close (my_output_exoid);
 }
 
-
-template< unsigned NType , unsigned NRel , class field_type >
-bool gather_field_data( const field_type & field ,
-                        const stk::mesh::Entity     & entity ,
+template< class field_type >
+bool gather_field_data( unsigned expected_num_rel, const field_type & field ,
+                        const stk::mesh::Entity & entity ,
                         typename stk::mesh::FieldTraits< field_type >::data_type * dst,
-                        stk::mesh::EntityRank EType )
+                        stk::mesh::EntityRank entity_rank,
+                        const int dim)
 {
   typedef typename stk::mesh::FieldTraits< field_type >::data_type T ;
 
-  stk::mesh::PairIterRelation rel = entity.relations( EType );
+  stk::mesh::PairIterRelation rel = entity.relations( entity_rank );
 
-  bool result = NRel == (unsigned) rel.size();
+  bool result = expected_num_rel == (unsigned) rel.size();
 
   if ( result ) {
-    T * const dst_end = dst + NType * NRel ;
-    for ( const T * src ;
-          ( dst < dst_end ) &&
-          ( src = field_data( field , * rel->entity() ) ) ;
-          ++rel , dst += NType ) {
-      stk::Copy<NType>( dst , src );
+    // Iterate over field data for each related entity and copy data
+    // into src for one entity at a time
+    T * const dst_end = dst + dim * expected_num_rel ;
+    for ( ; dst < dst_end ; ++rel , dst += dim ) {
+      const T* src = field_data( field , * rel->entity() );
+      if (!src) {
+        break;
+      }
+      // FIXME:
+      if(dim == 1)
+      	stk::Copy<1>( dst , src );
+      if(dim == 2)
+      	stk::Copy<2>( dst , src );
+      if(dim == 3)
+      	stk::Copy<3>( dst , src );
     }
     result = dst == dst_end ;
   }
   return result ;
 }
+
 
 bool
 Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
@@ -921,11 +938,10 @@ Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
 
   const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
   const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
-  const stk::mesh::TopologicalMetaData & topData = mesh.my_topData;
 
   // All element buckets:
   const std::vector<stk::mesh::Bucket*> & elem_buckets =
-    bulkData.buckets( topData.element_rank );
+    bulkData.buckets( stk::mesh::fem::element_rank(mesh.my_fem) );
 
   // Verify coordinates_field by gathering the nodal coordinates
   // from each element's nodes.
@@ -935,48 +951,32 @@ Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
 
     const stk::mesh::Bucket& bucket = **element_bucket_it;
     const size_t num_buckets = bucket.size();
+	  const CellTopologyData * cellTopologyData =
+	  		stk::mesh::fem::get_cell_topology(bucket).getCellTopologyData();
+
+	  const int num_nodes = cellTopologyData->node_count;
+    const int & dim = mesh.my_spatial_dimension;
+    double elem_coord[ num_nodes ][ dim ];
 
     for( size_t bucket_index = 0; bucket_index < num_buckets; ++bucket_index) {
       const stk::mesh::Entity & elem = bucket[bucket_index] ;
-#ifdef DEBUG_OUTPUT
+
+      #ifdef DEBUG_OUTPUT
       oss << "Element " << elem.identifier();
       sub_sub_progress_message(&oss);
 #endif
-      const char * topo_name = mesh.my_topData.get_cell_topology(bucket)->name;
-      oss << topo_name;
-      const string topo_str = oss.str(); oss.str(""); oss.clear();
-      const int num_nodes = mesh.my_topData.get_cell_topology(bucket)->node_count;
-      const int & dim = mesh.my_spatial_dimension;
-      double elem_coord[ num_nodes ][ dim ];
 
-      if(topo_str == "Quadrilateral_4")
-      {
-    	  result = gather_field_data< shards::Quadrilateral<4>::dimension , shards::Quadrilateral<4>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
-      }
-      else if(topo_str == "Hexahedron_8")
-      {
-    	  result = gather_field_data< shards::Hexahedron<8>::dimension , shards::Hexahedron<8>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
-      }
-      else if (topo_str == "Triangle_3")
-      {
-    	  result = gather_field_data< shards::Triangle<3>::dimension , shards::Triangle<3>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
-      }
-      else if (topo_str == "Tetrahedron_4")
-      {
-    	  result = gather_field_data< shards::Tetrahedron<4>::dimension , shards::Tetrahedron<4>::node_count >( coordinates_field , elem , & elem_coord[0][0], topData.node_rank );
-      }
-      else
-      {
-    	  oss << "verify_coordinates_field() does not recognize element type: " << topo_name;
-    	  error_message(cout, &oss);
-    	  exit(1);
-      }
+      const bool gather_result =
+        gather_field_data
+        ( num_nodes, coordinates_field , elem , & elem_coord[0][0], NODE_RANK, dim );
 
-      if ( result == false ) {
+
+      if ( gather_result == false ) {
     	  oss << "verify_coordinates_field() gather was not successful";
     	  error_message(cout, &oss);
     	  exit(1);
       }
+
 #ifdef DEBUG_OUTPUT
       for (int node_index=0 ; node_index<num_nodes ; ++node_index )
       {
