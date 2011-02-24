@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 2.7)
+cmake_minimum_required(VERSION 2.8)
 
 # Error check up front
 IF (NOT DEFINED CJ_TRILINOS_DIR)
@@ -32,9 +32,10 @@ SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER} )
 SET(CMAKE_C_COMPILER ${Trilinos_C_COMPILER} )
 
 add_definitions("-g -O2")
+
 # End of setup and error checking
 #  NOTE: PROJECT command checks for compilers, so this statement
-#        is moved AFTER setting CMAKE_CXX_COMPILER from Trilinos
+#        is moved AFTER setting CMAKE_CXX_COMPILER opton
 
 PROJECT(Cj)
 
