@@ -51,3 +51,5 @@ target_link_libraries(Cj shards)
 target_link_libraries(Cj curl hdf5 hdf5_hl exodus netcdf z)
 target_link_libraries(Cj ${Boost_LIBRARIES})
 target_link_libraries(Cj ${JsonCpp_LIBRARY})
+
+add_subdirectory(gui)
