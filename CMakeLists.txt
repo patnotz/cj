@@ -63,5 +63,16 @@ ELSE()
   SET(CJ_IOSS FALSE)
 ENDIF()
 
+################################################################################
+# GTest
+# See: http://code.google.com/p/googletest/
+################################################################################
+set(GTEST_ROOT /usr/local/gtest-1.5.0)
+find_package(GTest)
+if(GTEST_FOUND)
+   enable_testing(true)
+endif()
+
+
 add_subdirectory(src)
 

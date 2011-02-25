@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
+add_subdirectory(jsoncpp-0.5.0)
 #
 SET(SOURCES
 	cj_main.cpp
