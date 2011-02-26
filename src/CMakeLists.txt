@@ -23,6 +23,9 @@ link_directories (${Trilinos_LIBRARY_DIRS} ${Trilinos_TPL_LIBRARY_DIRS})
 
 add_library(cjLib ${SOURCES} ${HEADERS})
 
+find_package(Boost 1.46.0 COMPONENTS program_options REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
 # Now build executables from this library, tailored main()s, and Trilinos
 
 add_executable(Cj cj_main.cpp)
@@ -37,3 +40,4 @@ target_link_libraries(Cj stk_util_parallel)
 target_link_libraries(Cj stk_util_util) 
 target_link_libraries(Cj shards) 
 target_link_libraries(Cj curl hdf5 hdf5_hl exodus netcdf z)
+target_link_libraries(Cj ${Boost_LIBRARIES})
