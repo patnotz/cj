@@ -344,18 +344,13 @@ Mesh_Manager::import_nodes()
 {
 	int error;
 	/* read nodal coordinates values and names from database */
-	my_x = (float *) calloc(my_num_nodes, sizeof(float));
-	my_y = (float *) calloc(my_num_nodes, sizeof(float));
+	my_x = new float[my_num_nodes]; //FIXME: free me later
+	my_y = new float[my_num_nodes]; //FIXME: free me later
 	if (my_num_dim >= 3)
-		my_z = (float *) calloc(my_num_nodes, sizeof(float));
+		my_z = new float[my_num_nodes]; //FIXME: free me later
 	else
 		my_z = 0;
 	error = ex_get_coord (my_input_exoid, my_x, my_y, my_z);
-
-//  free (x);
-//  free (y);
-//  if (my_num_dim >= 3)
-//  free (z);
 }
 
 void
@@ -370,7 +365,7 @@ Mesh_Manager::import_elem_map()
 
 	int error;
 	/* read element order map */
-	my_elem_map = (int *) calloc(my_num_elem, sizeof(int));
+	my_elem_map = new int[my_num_elem]; //FIXME: free me later
 	error = ex_get_map (my_input_exoid, my_elem_map);
 }
 
@@ -388,10 +383,10 @@ Mesh_Manager::import_blocks()
 	int error;
 
 	/* read element block parameters */
-	my_block_ids = (int *) calloc(my_num_elem_blk, sizeof(int));
-	my_num_elem_in_block = (int *) calloc(my_num_elem_blk, sizeof(int));
-	my_num_nodes_per_elem = (int *) calloc(my_num_elem_blk, sizeof(int));
-	my_num_attr = (int *) calloc(my_num_elem_blk, sizeof(int));
+	my_block_ids = new int[my_num_elem_blk]; // FIXME: free me later
+	my_num_elem_in_block = new int[my_num_elem_blk];// FIXME: free me later
+	my_num_nodes_per_elem = new int[my_num_elem_blk];// FIXME: free me later
+	my_num_attr = new int[my_num_elem_blk];// FIXME: free me later
 	error = ex_get_elem_blk_ids (my_input_exoid, my_block_ids);
 	for (int i=0; i<my_num_elem_blk; i++)
 	{
@@ -434,11 +429,9 @@ Mesh_Manager::import_connectivities()
 		oss << "Reading connectivity for block " << my_block_ids[i];
 		progress_message(&oss, method_name);
 #endif
-		connectivity = (int *) calloc((my_num_nodes_per_elem[i] * my_num_elem_in_block[i]),
-				sizeof(int));
+		connectivity = new int[my_num_nodes_per_elem[i] * my_num_elem_in_block[i]]; // FIXME: free me later
 		error = ex_get_elem_conn (my_input_exoid, my_block_ids[i], connectivity);
         my_connectivities.insert(pair<int,int*>(my_block_ids[i],connectivity));
-		//print_connectivity(my_block_ids[i]);
 	}
 }
 
@@ -483,9 +476,9 @@ Mesh_Manager::import_node_sets()
 	int * node_list;
 	float * dist_fact;
 
-	my_node_set_ids = (int *) calloc(my_num_node_sets, sizeof(int));
-	my_num_nodes_in_node_set = (int *) calloc(my_num_node_sets, sizeof(int));
-	my_num_df_in_node_set = (int *) calloc(my_num_node_sets, sizeof(int));
+	my_node_set_ids = new int [my_num_node_sets];// FIXME: free me later
+	my_num_nodes_in_node_set = new int [my_num_node_sets];// FIXME: free me later
+	my_num_df_in_node_set = new int [my_num_node_sets]; // FIXME: free me later
 	error = ex_get_node_set_ids (my_input_exoid, my_node_set_ids);
 	for (int i=0; i<my_num_node_sets; i++)
 	{
@@ -499,8 +492,8 @@ Mesh_Manager::import_node_sets()
 		oss << "Number of distribution factors in set: " << my_num_df_in_node_set[i];
 		sub_sub_progress_message(&oss);
 #endif
-		node_list = (int *) calloc(my_num_nodes_in_node_set[i], sizeof(int));
-		dist_fact = (float *) calloc(my_num_nodes_in_node_set[i], sizeof(float));
+		node_list = new int[my_num_nodes_in_node_set[i]]; // FIXME: free me later
+		dist_fact = new float[my_num_nodes_in_node_set[i]];// FIXME: free me later
 		error = ex_get_node_set (my_input_exoid, my_node_set_ids[i], node_list);
 		if (my_num_df_in_node_set[i] > 0)
 		{
@@ -527,9 +520,9 @@ Mesh_Manager::import_side_sets()
 	int * side_list;
 	int * node_ctr_list;
 
-	my_side_set_ids = (int *) calloc(my_num_side_sets, sizeof(int));
-	my_num_elem_in_side_set = (int *) calloc(my_num_side_sets, sizeof(int));
-	my_num_df_in_side_set = (int *) calloc(my_num_side_sets, sizeof(int));
+	my_side_set_ids = new int[my_num_side_sets]; // FIXME: free me later
+	my_num_elem_in_side_set = new int [my_num_side_sets]; // FIXME: free me later
+	my_num_df_in_side_set = new int [my_num_side_sets]; // FIXME: free me later
 	error = ex_get_side_set_ids (my_input_exoid, my_side_set_ids);
 
 	for (int i=0; i<my_num_side_sets; i++)
@@ -543,11 +536,11 @@ Mesh_Manager::import_side_sets()
 		sub_sub_progress_message(&oss);
 #endif
 		/* Note: The # of elements is same as # of sides! */
-		elem_list = (int *) calloc(my_num_elem_in_side_set[i], sizeof(int));
-		side_list = (int *) calloc(my_num_elem_in_side_set[i], sizeof(int));
-		node_ctr_list = (int *) calloc(my_num_elem_in_side_set[i], sizeof(int));
-		node_list = (int *) calloc(my_num_elem_in_side_set[i]*21, sizeof(int));
-		dist_fact = (float *) calloc(my_num_df_in_side_set[i], sizeof(float));
+		elem_list = new int[my_num_elem_in_side_set[i]]; // FIXME: free me later
+		side_list = new int[my_num_elem_in_side_set[i]];// FIXME: free me later
+		node_ctr_list = new int [my_num_elem_in_side_set[i]]; // FIXME: free me later
+		node_list = new int[my_num_elem_in_side_set[i]*21]; // FIXME: free me later
+		dist_fact = new float [my_num_df_in_side_set[i]]; // FIXME: free me later
 		error = ex_get_side_set (my_input_exoid, my_side_set_ids[i], elem_list, side_list);
 		error = ex_get_side_set_node_list (my_input_exoid, my_side_set_ids[i], node_ctr_list,
 				node_list);

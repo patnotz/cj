@@ -59,8 +59,8 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
     const int CPU_word_size = mesh_manager.cpu_word_size();
     const int IO_word_size = mesh_manager.io_word_size();
 
-	float * glob_var_vals = (float *) calloc (num_glo_vars, CPU_word_size);
-	float * nodal_var_vals = (float *) calloc (num_nodes, CPU_word_size);
+	float glob_var_vals[num_glo_vars];
+	float nodal_var_vals[num_nodes];
 
 	int time_step = 1;
 	int num_time_steps = 10;
@@ -86,13 +86,12 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 			for (int j=0; j<num_blocks; j++)
 			{
 				const int num_elem_in_block = mesh_manager.num_elem_in_block(j);
-				float * elem_var_vals = (float *) calloc (num_elem_in_block, CPU_word_size);
+				float elem_var_vals[num_elem_in_block];
 				for (int m=0; m<num_elem_in_block; m++)
 				{
 					elem_var_vals[m] = (float)(k+1) + (float)(j+2) + ((float)(m+1)*time_value);
 				}
 				mesh_manager.write_element_variable_to_output(time_step,time_value,elem_var_vals,k+1,j);
-				free(elem_var_vals);
 			}
 		}
 		mesh_manager.update_output();
