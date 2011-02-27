@@ -10,7 +10,10 @@ ENDIF()
 
 include(${QT_USE_FILE})
 
-include_directories(.)
+include_directories(
+    .
+    ${JsonCpp_INCLUDE_DIRS}
+    )
 
 SET(qcj_SRCS
     gui_main.cpp
@@ -41,4 +44,9 @@ add_executable(qcj
     ${qcj_MOC_UI}
     ${qcj_RCC_SRCS}
 )
-target_link_libraries(qcj ${QT_LIBRARIES} pthread)
+
+link_directories (
+    ${JsonCpp_LIBRARY_DIRS}
+)
+
+target_link_libraries(qcj ${QT_LIBRARIES} ${Cj_LIBRARIES} pthread)

@@ -1,4 +1,3 @@
-
 #ifndef GUI_MAINWINDOW_H_
 #define GUI_MAINWINDOW_H_
 
@@ -9,9 +8,10 @@ class QLineEdit;
 class QPushButton;
 class QTextBrowser;
 
+#include <json/json.h>
+
 class MainWindow : public QMainWindow
 {
-
 	Q_OBJECT
 
 public:
@@ -21,7 +21,7 @@ protected:
 	void closeEvent(QCloseEvent * event);
 
 private slots:
-  void openInputMesh();
+  	void openInputMesh();
 	void openOutputMesh();
 	void run();
 
@@ -47,6 +47,8 @@ private:
 
 	QPushButton *runPushButton;
 	QAction * quitAction;
+
+	Json::Value config;
 };
 
 #endif /* GUI_MAINWINDOW_H_ */

@@ -1,6 +1,6 @@
+#include <iostream>
 #include <QtGui>
 #include <gui_mainWindow.h>
-#include <iostream>
 
 int main( int argc, char * argv[] )
 {

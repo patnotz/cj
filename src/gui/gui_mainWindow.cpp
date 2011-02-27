@@ -1,5 +1,7 @@
 #include <QtGui>
 #include <gui_mainWindow.h>
+#include <drive_simulation.h>
+#include <log.h>
 
 MainWindow::MainWindow() {
 	createWidgets();
@@ -39,8 +41,9 @@ void MainWindow::createWidgets() {
 
 	QHBoxLayout *runHBoxLayout = new QHBoxLayout;
 	runPushButton = new QPushButton("Run");
-	runPushButton->setEnabled(false);
+	runPushButton->setEnabled(true); // FIXME: should use some kind of validation
 	runHBoxLayout->addWidget(runPushButton,0,Qt::AlignRight);
+	connect(runPushButton, SIGNAL(clicked()), this, SLOT(run()));
 
 	QVBoxLayout *mainWindowVBoxLayout = new QVBoxLayout(centralWidget);
 	mainWindowVBoxLayout->addLayout(inputMeshHBoxLayout,0);
@@ -77,17 +80,24 @@ void MainWindow::closeEvent(QCloseEvent * event) {
 }
 
 void MainWindow::openInputMesh() {
-	QString fileName = QFileDialog::getOpenFileName(0,"Open Input Mesh", ".");
-	if(fileName.size() > 0)
+	QString fileName = QFileDialog::getOpenFileName(0,"Open Input Mesh", "/Users/pknotz/workspace/cj/problems");
+	if(fileName.size() > 0) {
 		inputMeshLineEdit->setText(fileName);
+		// FIXME: config should be updated when the text box changes using signal-slot
+		config["mesh-database"] = fileName.toStdString();
+	}
 }
 
 void MainWindow::openOutputMesh() {
-	QString fileName = QFileDialog::getOpenFileName(0,"Open Output Mesh", ".");
-	if(fileName.size() > 0)
+	QString fileName = QFileDialog::getOpenFileName(0,"Open Output Mesh", "/Users/pknotz/workspace/cj/problems");
+	if(fileName.size() > 0) {
 		outputMeshLineEdit->setText(fileName);
+		// FIXME: config should be updated when the text box changes using signal-slot
+		config["results-database"] = fileName.toStdString();
+	}
 }
 
 void MainWindow::run() {
-
+	Log & log = std::cout;
+	drive_simulation(config, log, 0, NULL);
 }
