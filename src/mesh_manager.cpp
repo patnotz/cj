@@ -49,7 +49,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	if(!my_input_initialized)
 	{
 		oss << "Output not initialized yet.";
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		exit(1);
 	}
 #ifdef DEBUG_OUTPUT
@@ -179,7 +179,7 @@ Mesh_Manager::map_node_coordinates( stk::mesh::EntityId node_id , double coord[]
 	if ( node_id < 1 || node_id > my_num_nodes) {
 		oss << "map_node_coordinates(): ERROR, node ("
 				<< node_id << ") must be greater than 0 or less than "<< my_num_nodes << std::endl;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		return;
 	}
 	const unsigned index = node_id - 1;
@@ -201,7 +201,7 @@ Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId n
 	if ( ele < 0 || ele >= my_num_elem_in_block[block]) {
 		oss << "map_node_ids(): ERROR, element ("
 				<< ele << ") must be greater than 0 or less than "<< my_num_elem_in_block[block] << std::endl;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		return;
 	}
 
@@ -243,7 +243,7 @@ Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId n
 	else
 	{
 		oss << "map_node_ids() does not recognize element type: " << elem_type;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		exit(1);
 	}
 }
@@ -277,14 +277,14 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem
 	else
 	{
 		oss << "part_pointer() does not recognize element type: " << elem_type;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		exit(1);
 	}
 	return part_ptr;
 }
 
 void
-Mesh_Manager::read_mesh()
+Mesh_Manager::read_mesh(Log & log)
 {
 	stringstream oss;
 	int error;
@@ -297,11 +297,11 @@ Mesh_Manager::read_mesh()
 	if(my_input_exoid<0)
 	{
 		oss << "Reading mesh failure.";
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 		exit(1);
 	}
 
-	initialize_read();
+	initialize_read(log);
 	import_nodes();
 	import_elem_map();
 	import_blocks();
@@ -314,7 +314,7 @@ Mesh_Manager::read_mesh()
 }
 
 void
-Mesh_Manager::initialize_read()
+Mesh_Manager::initialize_read(Log & log)
 {
 	  string method_name = "Mesh_Manager::initialize_read()";
 	  int error;
@@ -330,7 +330,7 @@ Mesh_Manager::initialize_read()
 	  error = ex_get_init (my_input_exoid, title, &my_num_dim, &my_num_nodes, &my_num_elem,
 	  &my_num_elem_blk, &my_num_node_sets, &my_num_side_sets);
 
-	  cout << endl <<
+	  log << endl <<
 			  "  ----------------------------------------------------------------------------" << endl <<
 			  "    Title: " << title << endl <<
 			  "    Spatial dimension: " << my_num_dim << endl <<
@@ -436,7 +436,7 @@ Mesh_Manager::import_connectivities()
 }
 
 void
-Mesh_Manager::print_connectivity(const int & block_id)
+Mesh_Manager::print_connectivity(Log & log, const int & block_id)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::print_connectivity()";
@@ -453,13 +453,13 @@ Mesh_Manager::print_connectivity(const int & block_id)
 	int num_nodes_per_elem = my_num_nodes_per_elem[block_id - 1];
 	for(int i = 0;i < num_elem;++i)
 	{
-		cout << "Element " << i << ": ";
+		log << "Element " << i << ": ";
 		for(int j = 0;j < num_nodes_per_elem;++j)
 		{
 			const int index = i*num_nodes_per_elem + j;
-			cout << connectivity[index] << " ";
+			log << connectivity[index] << " ";
 		}
-		cout << endl;
+		log << endl;
 	}
 }
 
@@ -798,7 +798,7 @@ Mesh_Manager::write_time_step_info(const int & time_step_num, const float & time
 	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write time step info to file: " << my_output_file_name;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 	}
 	error = ex_put_time (my_output_exoid, time_step_num, &time_value);
 }
@@ -831,7 +831,7 @@ Mesh_Manager::write_global_variables_to_output(const int & time_step, const floa
 	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write global variables to file: " << my_output_file_name;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 	}
 	int num_glo_vars = my_global_variable_names.size();
 	error = ex_put_glob_vars (my_output_exoid, time_step, num_glo_vars, global_var_vals);
@@ -851,7 +851,7 @@ Mesh_Manager::write_nodal_variable_to_output(const int & time_step, const float 
 	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write nodal variables to file: " << my_output_file_name;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 	}
 	error = ex_put_nodal_var (my_output_exoid, time_step, node_var_index, my_num_nodes, nodal_var_vals);
 }
@@ -869,7 +869,7 @@ Mesh_Manager::write_element_variable_to_output(const int & time_step, const floa
 	if(!my_output_initialized)
 	{
 		oss << "Output file is not initialized, can't write variables to file: " << my_output_file_name;
-		error_message(cout, &oss);
+		error_message(std::cerr, &oss);
 	}
 	error = ex_put_elem_var (my_output_exoid, time_step, ele_var_index, my_block_ids[block_index],my_num_elem_in_block[block_index], elem_var_vals);
 }
@@ -918,7 +918,7 @@ bool gather_field_data( unsigned expected_num_rel, const field_type & field ,
 
 
 bool
-Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
+Mesh_Manager::verify_coordinates_field(Log & log, const stk::mesh::STK_Mesh & mesh )
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -966,18 +966,18 @@ Mesh_Manager::verify_coordinates_field( const stk::mesh::STK_Mesh & mesh )
 
       if ( gather_result == false ) {
     	  oss << "verify_coordinates_field() gather was not successful";
-    	  error_message(cout, &oss);
+    	  error_message(std::cerr, &oss);
     	  exit(1);
       }
 
 #ifdef DEBUG_OUTPUT
       for (int node_index=0 ; node_index<num_nodes ; ++node_index )
       {
-    	  cout << "                   node " << node_index + 1 << ": ";
+    	  log << "                   node " << node_index + 1 << ": ";
     	  for (int coord_index=0 ; coord_index<dim ; ++coord_index) {
-    		  cout << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
+    		  log << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
     	  }
-    	  cout << endl;
+    	  log << endl;
       }
 #endif
     }

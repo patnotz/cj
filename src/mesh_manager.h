@@ -13,6 +13,7 @@
 #include "exodusII.h"
 
 #include <stk_mesh.h>
+#include <log.h>
 
 class Mesh_Manager {
 public:
@@ -32,9 +33,9 @@ public:
 			stk::mesh::EntityId node_id,
 			double coord[],
 			const int spatial_dim);
-	bool verify_coordinates_field(const stk::mesh::STK_Mesh & mesh);
+	bool verify_coordinates_field(Log & log, const stk::mesh::STK_Mesh & mesh);
 
-	void read_mesh();
+	void read_mesh(Log & log);
 	void initialize_output(const char * title);
 	void insert_global_var_name(const char * name) {
 		my_global_variable_names.push_back(name);
@@ -101,12 +102,12 @@ public:
 	}
 
 private:
-	void initialize_read();
+	void initialize_read(Log & log);
 	void import_nodes();
 	void import_elem_map();
 	void import_blocks();
 	void import_connectivities();
-	void print_connectivity(const int & block_id);
+	void print_connectivity(Log & log, const int & block_id);
 	void import_node_sets();
 	void import_side_sets();
 
