@@ -16,9 +16,9 @@ void MainWindow::createWidgets() {
 	centralWidget = new QWidget;
 	setCentralWidget(centralWidget);
 
-	inputMeshLabel = new QLabel("Input Mesh:");
+	inputMeshLabel = new QLabel(tr("Input Mesh:"));
 	inputMeshLineEdit = new QLineEdit;
-	inputMeshOpenPushButton = new QPushButton("Open...");
+	inputMeshOpenPushButton = new QPushButton(tr("Open..."));
 	QHBoxLayout *inputMeshHBoxLayout = new QHBoxLayout;
 	inputMeshHBoxLayout->addWidget(inputMeshLabel,0);
 	inputMeshHBoxLayout->addWidget(inputMeshLineEdit,1);
@@ -27,7 +27,7 @@ void MainWindow::createWidgets() {
 
 	outputMeshLabel = new QLabel("Output Mesh:");
 	outputMeshLineEdit = new QLineEdit;
-	outputMeshOpenPushButton = new QPushButton("Open...");
+	outputMeshOpenPushButton = new QPushButton(tr("Open..."));
 	QHBoxLayout *outputMeshHBoxLayout = new QHBoxLayout;
 	outputMeshHBoxLayout->addWidget(outputMeshLabel,0);
 	outputMeshHBoxLayout->addWidget(outputMeshLineEdit,1);
@@ -35,12 +35,11 @@ void MainWindow::createWidgets() {
 	connect(outputMeshOpenPushButton, SIGNAL(clicked()), this, SLOT(openOutputMesh()));
 
 	outputTextBrowser = new QTextBrowser;
-	//outputTextBrowser->append("Hello, World!");
 	QHBoxLayout *outputTextBrowserHBoxLayout = new QHBoxLayout;
 	outputTextBrowserHBoxLayout->addWidget(outputTextBrowser,1);
 
 	QHBoxLayout *runHBoxLayout = new QHBoxLayout;
-	runPushButton = new QPushButton("Run");
+	runPushButton = new QPushButton(tr("Run"));
 	runPushButton->setEnabled(true); // FIXME: should use some kind of validation
 	runHBoxLayout->addWidget(runPushButton,0,Qt::AlignRight);
 	connect(runPushButton, SIGNAL(clicked()), this, SLOT(run()));
@@ -53,9 +52,9 @@ void MainWindow::createWidgets() {
 }
 
 void MainWindow::createActions() {
-	quitAction = new QAction("&Quit", this);
+	quitAction = new QAction(tr("&Quit"), this);
 	quitAction->setShortcut(QKeySequence("Ctrl+Q"));
-	quitAction->setStatusTip("Quit the application that is not called Cj");
+	quitAction->setStatusTip(tr("Quit the application that is not called Cj"));
 	connect(quitAction, SIGNAL(triggered()), this, SLOT(close()));
 }
 
@@ -80,7 +79,7 @@ void MainWindow::closeEvent(QCloseEvent * event) {
 }
 
 void MainWindow::openInputMesh() {
-	QString fileName = QFileDialog::getOpenFileName(0,"Open Input Mesh", "/Users/pknotz/workspace/cj/problems");
+	QString fileName = QFileDialog::getOpenFileName(0,tr("Open Input Mesh"), "/Users/pknotz/workspace/cj/problems");
 	if(fileName.size() > 0) {
 		inputMeshLineEdit->setText(fileName);
 		// FIXME: config should be updated when the text box changes using signal-slot
@@ -89,7 +88,7 @@ void MainWindow::openInputMesh() {
 }
 
 void MainWindow::openOutputMesh() {
-	QString fileName = QFileDialog::getOpenFileName(0,"Open Output Mesh", "/Users/pknotz/workspace/cj/problems");
+	QString fileName = QFileDialog::getOpenFileName(0,tr("Open Output Mesh"), "/Users/pknotz/workspace/cj/problems");
 	if(fileName.size() > 0) {
 		outputMeshLineEdit->setText(fileName);
 		// FIXME: config should be updated when the text box changes using signal-slot
