@@ -1,19 +1,21 @@
 #include <stdlib.h>
+#include <string>
 #include <iostream>
 #include <mesh_manager.h>
 #include <messages.h>
 #include <drive_simulation.h>
-#include <log.h>
 
 using namespace std;
 
-int drive_simulation(Log & log, int argc, char * argv[] )
+int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 {
 	start_message(log);
 
 	// This information is hard coded for now, until we have an input reader:
-	char* mesh_input_file_name = (char*)"mesh.g";
-	char* mesh_output_file_name = (char*)"mesh.e";
+	std::string meshFileName = config["mesh-database"].asString();
+	std::string resultsFileName = config["results-database"].asString();
+	const char* mesh_input_file_name = meshFileName.c_str();
+	const char* mesh_output_file_name = resultsFileName.c_str();
 
 	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name);
 	mesh_manager.read_mesh();

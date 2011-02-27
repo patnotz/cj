@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 
+
+set(JsonCpp_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp-0.5.0/)
+set(JsonCpp_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR}/jsoncpp-0.5.0/)
+set(JsonCpp_LIBRARY jsoncpp)
 add_subdirectory(jsoncpp-0.5.0)
+
 #
 SET(SOURCES
 	cj_main.cpp
@@ -17,9 +22,13 @@ set(CJ_TRILINOS_LIBS ${Trilinos_LIBRARIES} ${Trilinos_TPL_LIBRARIES})
 
 include_directories (${Trilinos_INCLUDE_DIRS}
                      .
-                     ${Trilinos_TPL_INCLUDE_DIRS})
+                     ${Trilinos_TPL_INCLUDE_DIRS}
+                     ${JsonCpp_INCLUDE_DIRS})
 
-link_directories (${Trilinos_LIBRARY_DIRS} ${Trilinos_TPL_LIBRARY_DIRS})
+link_directories (
+    ${Trilinos_LIBRARY_DIRS} 
+    ${Trilinos_TPL_LIBRARY_DIRS} 
+    ${JsonCpp_LIBRARY_DIRS})
 
 add_library(cjLib ${SOURCES} ${HEADERS})
 
@@ -41,3 +50,4 @@ target_link_libraries(Cj stk_util_util)
 target_link_libraries(Cj shards) 
 target_link_libraries(Cj curl hdf5 hdf5_hl exodus netcdf z)
 target_link_libraries(Cj ${Boost_LIBRARIES})
+target_link_libraries(Cj ${JsonCpp_LIBRARY})

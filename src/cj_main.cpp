@@ -3,6 +3,8 @@
 
 #include <boost/program_options.hpp>
 
+#include <json/json.h>
+
 #include <drive_simulation.h>
 #include <log.h>
 
@@ -31,30 +33,57 @@ int main( int argc, char * argv[] )
 	    return 1;
 	}
 
-	// Setup the output log file. No log option or a  file name of "-"
-	// causes the code to use standard output.
+	// Get the input file name
+	std::string inputFileName = "input.json";
+	if ( vm.count("input")) {
+		inputFileName = vm["input"].as<std::string>();
+	}
+
+	// Get the output log file name
+	std::string logFileName = "output.log";
+	if ( vm.count("log")) {
+		logFileName = vm["log"].as<std::string>();
+	}
+
+	// Setup the output log file. A file name of "-" causes the code
+	// to use standard output.
 	Log *logPtr = NULL;
 	std::ofstream logFile;
-	if ( (! vm.count("log")) || vm["log"].as<std::string>() == "-") {
+	if ( logFileName == "-") {
 		logPtr = & std::cout;
 	} else {
-		std::string logFileName = vm["log"].as<std::string>();
 		logFile.open(logFileName.c_str());
 		logPtr = & logFile;
 	}
 	Log & log = *logPtr;
 
-	// Read the input file
+	// Parse the input file
+    log << "Using input file " << inputFileName << std::endl;
 	std::ifstream inputFile;
-	if ( ! vm.count("input")) {
-	    std::cerr << "Input file not set.\n";
-	    // return 1; // this will become and error soon
-	}
-	const std::string inputFileName = vm["input"].as<std::string>();
-    log << "Using input file " << inputFileName << ".\n";
 	inputFile.open(inputFileName.c_str());
+	Json::Value config;
+	Json::Reader reader;
+	const bool parsingSuccessful = reader.parse(inputFile, config);
+	if ( ! parsingSuccessful ) {
+		std::cerr << "Error parsing input file: " << inputFileName << std::endl;
+		return 1;
+	}
 
-	// Run the actual simulation
-	const int error_code = drive_simulation(log, argc, argv);
+	// If the user requested an alternate input mesh, override the input file:
+	if ( vm.count("mesh")) {
+		const std::string meshFileName = vm["mesh"].as<std::string>();
+		config["mesh-database"] = meshFileName;
+		log << "Override input mesh file name: " << meshFileName << std::endl;
+	}
+
+	// If the user requested an alternate output mesh, override the input file:
+	if ( vm.count("results")) {
+		const std::string resultsFileName = vm["results"].as<std::string>();
+		config["results-database"] = resultsFileName;
+		log << "Override output results file name: " << resultsFileName << std::endl;
+	}
+
+    // Run the actual simulation
+	const int error_code = drive_simulation(config, log, argc, argv);
 	return error_code;
 }

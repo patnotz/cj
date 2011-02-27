@@ -22,16 +22,16 @@ SET(HEADERS
     json/writer.h
   )
 
-include_directories (.)
+include_directories (${JsonCpp_INCLUDE_DIRS})
+link_directories (${JsonCpp_LIBRARY_DIRS})
 
-link_directories ()
-
-add_library(jsoncpp ${SOURCES} ${HEADERS})
+add_library(${JsonCpp_LIBRARY} ${SOURCES} ${HEADERS})
 
 if(GTEST_FOUND)
-   include_directories(${GTEST_INCLUDE_DIRS})
+   enable_testing(true)
+   include_directories(${GTEST_INCLUDE_DIRS} ${JsonCpp_INCLUDE_DIRS})
    add_executable(json_unit_tests json_unit_tests.cpp)
-   target_link_libraries(json_unit_tests jsoncpp)
+   target_link_libraries(json_unit_tests ${JsonCpp_LIBRARY})
    target_link_libraries(json_unit_tests ${GTEST_BOTH_LIBRARIES})
-   add_test(AllJsonTests json_unit_tests)
+   add_test(JsonUnitTests json_unit_tests)
 endif()
