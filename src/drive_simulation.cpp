@@ -16,8 +16,8 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 	const char* mesh_input_file_name = meshFileName.c_str();
 	const char* mesh_output_file_name = resultsFileName.c_str();
 
-	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name);
-	mesh_manager.read_mesh(log);
+	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name,log);
+	mesh_manager.read_mesh();
 
     stk::ParallelMachine parallel_machine = stk::parallel_machine_init(&argc, &argv);
     stk::mesh::STK_Mesh stk_mesh(parallel_machine, mesh_manager.dimension());
@@ -25,7 +25,7 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
     mesh_manager.populate_STK_mesh(&stk_mesh);
 
     bool local_status = true ;
-    local_status = mesh_manager.verify_coordinates_field(log, stk_mesh);
+    local_status = mesh_manager.verify_coordinates_field(stk_mesh);
     stringstream oss;
     oss << "Verifying the STK mesh coordinates field: ";
     printStatus(log, local_status, &oss);
@@ -45,8 +45,8 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 	mesh_manager.insert_element_var_name(ele_var_1);
 	mesh_manager.insert_element_var_name(ele_var_2);
 
-	const char * title = (const char*)"This is a test";
-	mesh_manager.initialize_output(title);
+	const char * title = resultsFileName.c_str();
+	mesh_manager.initialize_output(title,stk_mesh);
 
 	const int num_glo_vars = mesh_manager.num_global_variables();
 	const int num_nod_vars = mesh_manager.num_nodal_variables();

@@ -4,4 +4,6 @@
 #include <ostream>
 typedef std::ostream Log;
 
+//#define DEBUG_OUTPUT
+
 #endif /* LOG_H_ */
