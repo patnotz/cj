@@ -27,11 +27,12 @@ using stk::mesh::fem::NODE_RANK;
 
 using namespace std;
 
-Mesh_Manager::Mesh_Manager(const char * input_file_name, const char * output_file_name)
+Mesh_Manager::Mesh_Manager(const char * input_file_name, const char * output_file_name, Log & log)
 :  my_input_file_name(input_file_name),
    my_output_file_name(output_file_name),
    my_input_initialized(false),
-   my_output_initialized(false)
+   my_output_initialized(false),
+   my_log(log)
 {}
 
 Mesh_Manager::~Mesh_Manager()
@@ -44,7 +45,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::populate_STK_mesh()";
 	oss << "Populating STK mesh";
-	progress_message(&oss, method_name);
+	progress_message(my_log,&oss, method_name);
 #endif
 	if(!my_input_initialized)
 	{
@@ -54,7 +55,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	}
 #ifdef DEBUG_OUTPUT
 	oss << "Populating the stk PartVector";
-	sub_progress_message(&oss);
+	sub_progress_message(my_log,&oss);
 #endif
 	// populate the list of block parts
 	for(int i = 0 ; i < my_num_elem_blk; ++i)
@@ -70,13 +71,13 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	for(int i = 0 ; i < my_num_elem_blk; ++i)
 	{
 		oss << mesh->my_parts[i]->name();
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 	}
 #endif
     mesh->my_metaData.commit(); // this has to be called before we can modify the mesh
 #ifdef DEBUG_OUTPUT
 	oss << "Mesh committed, adding the elements";
-	sub_progress_message(&oss);
+	sub_progress_message(my_log,&oss);
 #endif
 	mesh->my_bulkData.modification_begin(); // Begin modifying the mesh
 	int ele_map_index = 0;
@@ -120,11 +121,11 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 			{
 				oss << node_ids[node] << ",";
 			}
-			sub_sub_progress_message(&oss);
+			sub_sub_progress_message(my_log,&oss);
 #endif
 #ifdef DEBUG_OUTPUT
 	oss << "Adding element id: " << elem_id << " in block " << mesh->my_parts[block]->name();
-	sub_sub_progress_message(&oss);
+	sub_sub_progress_message(my_log,&oss);
 #endif
 		    stk::mesh::declare_element(mesh->my_bulkData,*mesh->my_parts[block],elem_id,node_ids);
 			ele_map_index ++;
@@ -138,7 +139,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 
 #ifdef DEBUG_OUTPUT
 	oss << "Populating the coordinates field";
-	sub_progress_message(&oss);
+	sub_progress_message(my_log,&oss);
 #endif
     const std::vector<stk::mesh::Bucket*> & node_buckets =
     		mesh->my_bulkData.buckets(NODE_RANK);
@@ -150,7 +151,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
     	const stk::mesh::Bucket & bucket = **node_bucket_it;
 #ifdef DEBUG_OUTPUT
 	oss << "Coordinates field for bucket " << bucket.key();
-	sub_sub_progress_message(&oss);
+	sub_sub_progress_message(my_log,&oss);
 #endif
     	// Fill the nodal coordinates.
     	// Create a multidimensional array view of the
@@ -162,19 +163,24 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
     	for ( int i=0 ; i < num_sets_of_coords ; ++i )
     	{
     		const unsigned node_id = bucket[i].identifier();
-    		map_node_coordinates(node_id,& coordinates_array(0,i),my_num_dim);
+    		map_node_coordinates(node_id,& coordinates_array(0,i));
     	}
     }
+    //Now that x, y, and z are in the stk mesh field we can delete the temp data storage
+    delete my_x;
+    delete my_y;
+    if(my_num_dim > 2)
+    	delete my_z;
 }
 
 void
-Mesh_Manager::map_node_coordinates( stk::mesh::EntityId node_id , double coord[], const int spatial_dim )
+Mesh_Manager::map_node_coordinates( stk::mesh::EntityId node_id , double coord[])
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::map_node_coordinates()";
 	oss << "Adding the coordinates field for node " << node_id << " to STK mesh field my_coordinates";
-	progress_message(&oss, method_name);
+	progress_message(my_log,&oss, method_name);
 #endif
 	if ( node_id < 1 || node_id > my_num_nodes) {
 		oss << "map_node_coordinates(): ERROR, node ("
@@ -185,7 +191,7 @@ Mesh_Manager::map_node_coordinates( stk::mesh::EntityId node_id , double coord[]
 	const unsigned index = node_id - 1;
 	coord[0] = my_x[index];
 	coord[1] = my_y[index];
-	if(spatial_dim > 2)
+	if(my_num_dim > 2)
 		coord[2] = my_z[index];
 }
 
@@ -196,7 +202,7 @@ Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId n
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::map_node_ids()";
 	oss << "Converting the ExodusII connectivity for element " << ele << " of block " << block << " to STK mesh. Element type is " << elem_type;
-	progress_message(&oss, method_name);
+	progress_message(my_log,&oss, method_name);
 #endif
 	if ( ele < 0 || ele >= my_num_elem_in_block[block]) {
 		oss << "map_node_ids(): ERROR, element ("
@@ -284,7 +290,7 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem
 }
 
 void
-Mesh_Manager::read_mesh(Log & log)
+Mesh_Manager::read_mesh()
 {
 	stringstream oss;
 	int error;
@@ -301,7 +307,7 @@ Mesh_Manager::read_mesh(Log & log)
 		exit(1);
 	}
 
-	initialize_read(log);
+	initialize_read();
 	import_nodes();
 	import_elem_map();
 	import_blocks();
@@ -314,7 +320,7 @@ Mesh_Manager::read_mesh(Log & log)
 }
 
 void
-Mesh_Manager::initialize_read(Log & log)
+Mesh_Manager::initialize_read()
 {
 	  string method_name = "Mesh_Manager::initialize_read()";
 	  int error;
@@ -322,7 +328,7 @@ Mesh_Manager::initialize_read(Log & log)
 
 #ifdef DEBUG_OUTPUT
 	  oss << "Reading file: " << my_input_file_name;
-	  progress_message(&oss, method_name);
+	  progress_message(my_log,&oss, method_name);
 #endif
 	  /* read database parameters */
 	  char title[MAX_LINE_LENGTH+1];
@@ -330,7 +336,7 @@ Mesh_Manager::initialize_read(Log & log)
 	  error = ex_get_init (my_input_exoid, title, &my_num_dim, &my_num_nodes, &my_num_elem,
 	  &my_num_elem_blk, &my_num_node_sets, &my_num_side_sets);
 
-	  log << endl <<
+	  my_log << endl <<
 			  "  ----------------------------------------------------------------------------" << endl <<
 			  "    Title: " << title << endl <<
 			  "    Spatial dimension: " << my_num_dim << endl <<
@@ -344,10 +350,10 @@ Mesh_Manager::import_nodes()
 {
 	int error;
 	/* read nodal coordinates values and names from database */
-	my_x = new float[my_num_nodes]; //FIXME: free me later
-	my_y = new float[my_num_nodes]; //FIXME: free me later
+	my_x = new float[my_num_nodes];
+	my_y = new float[my_num_nodes];
 	if (my_num_dim >= 3)
-		my_z = new float[my_num_nodes]; //FIXME: free me later
+		my_z = new float[my_num_nodes];
 	else
 		my_z = 0;
 	error = ex_get_coord (my_input_exoid, my_x, my_y, my_z);
@@ -360,7 +366,7 @@ Mesh_Manager::import_elem_map()
 	string method_name = "Mesh_Manager::import_elem_map()";
 	stringstream oss;
 	oss << "Reading element map";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 
 	int error;
@@ -376,7 +382,7 @@ Mesh_Manager::import_blocks()
 	string method_name = "Mesh_Manager::import_blocks()";
 	stringstream oss;
 	oss << "Reading blocks";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 
 	char elem_type[MAX_STR_LENGTH+1];
@@ -398,15 +404,15 @@ Mesh_Manager::import_blocks()
 
 #ifdef DEBUG_OUTPUT
 		oss << "Element block: " << my_block_ids[i];
-		sub_progress_message(&oss);
+		sub_progress_message(my_log,&oss);
 		oss << "Element type: " << elem_type;
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 		oss << "Number of elements in block: " << my_num_elem_in_block[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 		oss << "Number of nodes per element: " << my_num_nodes_per_elem[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 		oss << "Number of attributes: " << my_num_attr[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 #endif
 	};
 }
@@ -427,7 +433,7 @@ Mesh_Manager::import_connectivities()
 	{
 #ifdef DEBUG_OUTPUT
 		oss << "Reading connectivity for block " << my_block_ids[i];
-		progress_message(&oss, method_name);
+		progress_message(my_log,&oss, method_name);
 #endif
 		connectivity = new int[my_num_nodes_per_elem[i] * my_num_elem_in_block[i]]; // FIXME: free me later
 		error = ex_get_elem_conn (my_input_exoid, my_block_ids[i], connectivity);
@@ -436,13 +442,13 @@ Mesh_Manager::import_connectivities()
 }
 
 void
-Mesh_Manager::print_connectivity(Log & log, const int & block_id)
+Mesh_Manager::print_connectivity(const int & block_id)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::print_connectivity()";
 	stringstream oss;
 	oss << "Block ID: " << block_id;
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	if(my_connectivities.find(block_id)==my_connectivities.end())
 		return;
@@ -453,13 +459,13 @@ Mesh_Manager::print_connectivity(Log & log, const int & block_id)
 	int num_nodes_per_elem = my_num_nodes_per_elem[block_id - 1];
 	for(int i = 0;i < num_elem;++i)
 	{
-		log << "Element " << i << ": ";
+		my_log << "Element " << i << ": ";
 		for(int j = 0;j < num_nodes_per_elem;++j)
 		{
 			const int index = i*num_nodes_per_elem + j;
-			log << connectivity[index] << " ";
+			my_log << connectivity[index] << " ";
 		}
-		log << endl;
+		my_log << endl;
 	}
 }
 
@@ -470,7 +476,7 @@ Mesh_Manager::import_node_sets()
 	string method_name = "Mesh_Manager::import_node_sets()";
 	stringstream oss;
 	oss << "Reading node sets";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	int * node_list;
@@ -486,11 +492,11 @@ Mesh_Manager::import_node_sets()
 				&(my_num_nodes_in_node_set[i]), &(my_num_df_in_node_set[i]));
 #ifdef DEBUG_OUTPUT
 		oss << "Node set: " << my_node_set_ids[i];
-		sub_progress_message(&oss);
+		sub_progress_message(my_log,&oss);
 		oss << "Number of nodes in set: " << my_num_nodes_in_node_set[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 		oss << "Number of distribution factors in set: " << my_num_df_in_node_set[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 #endif
 		node_list = new int[my_num_nodes_in_node_set[i]]; // FIXME: free me later
 		dist_fact = new float[my_num_nodes_in_node_set[i]];// FIXME: free me later
@@ -511,7 +517,7 @@ Mesh_Manager::import_side_sets()
 	string method_name = "Mesh_Manager::import_side_sets()";
 	stringstream oss;
 	oss << "Reading side sets";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	int * elem_list;
@@ -531,9 +537,9 @@ Mesh_Manager::import_side_sets()
 				&(my_num_df_in_side_set[i]));
 #ifdef DEBUG_OUTPUT
 		oss << "Side set " << my_side_set_ids[i];
-		sub_progress_message(&oss);
+		sub_progress_message(my_log,&oss);
 		oss << "Number of elements: " << my_num_elem_in_side_set[i];
-		sub_sub_progress_message(&oss);
+		sub_sub_progress_message(my_log,&oss);
 #endif
 		/* Note: The # of elements is same as # of sides! */
 		elem_list = new int[my_num_elem_in_side_set[i]]; // FIXME: free me later
@@ -557,13 +563,13 @@ Mesh_Manager::import_side_sets()
 }
 
 void
-Mesh_Manager::initialize_output(const char * title)
+Mesh_Manager::initialize_output(const char * title, const stk::mesh::STK_Mesh & mesh)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_output()";
 	stringstream oss;
 	oss << "Writing output file: " << my_output_file_name;
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 
 	int error;
@@ -575,7 +581,7 @@ Mesh_Manager::initialize_output(const char * title)
 
 	error = ex_put_init (my_output_exoid, title, my_num_dim, my_num_nodes, my_num_elem, my_num_elem_blk, my_num_node_sets, my_num_side_sets);
 
-    write_coordinates();
+    write_coordinates(mesh);
     write_elem_map();
     write_elem_blocks();
     write_elem_connectivities();
@@ -599,22 +605,64 @@ Mesh_Manager::initialize_output(const char * title)
 }
 
 void
-Mesh_Manager::write_coordinates()
+Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
 {
+	stringstream oss;
+
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_coordinates()";
-	stringstream oss;
 	oss << "Writing coordinates";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
-	error = ex_put_coord (my_output_exoid, my_x, my_y, my_z);
-	char * coord_names[3];
-	coord_names[0] = (char*)"xcoor";
-	coord_names[1] = (char*)"ycoor";
-	coord_names[2] = (char*)"zcoor";
-	error = ex_put_coord_names (my_output_exoid, coord_names);
+	//	error = ex_put_coord (my_output_exoid, my_x, my_y, my_z);
+	//	char * coord_names[3];
+	//	coord_names[0] = (char*)"xcoor";
+	//	coord_names[1] = (char*)"ycoor";
+	//	coord_names[2] = (char*)"zcoor";
+	//	error = ex_put_coord_names (my_output_exoid, coord_names);
+
+   float x[my_num_nodes];
+   float y[my_num_nodes];
+   float z[my_num_nodes];
+
+	bool result = true;
+
+	const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
+	const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
+
+    const std::vector<stk::mesh::Bucket*> & node_buckets =
+    		mesh.my_bulkData.buckets(NODE_RANK);
+
+    for ( std::vector<stk::mesh::Bucket*>::const_iterator
+    		node_bucket_it = node_buckets.begin() ;
+    		node_bucket_it != node_buckets.end() ; ++node_bucket_it )
+    {
+    	const stk::mesh::Bucket & bucket = **node_bucket_it;
+
+    	stk::mesh::BucketArray<stk::mesh::VectorFieldType> coordinates_array( mesh.my_coordinates_field, bucket );
+    	const int num_sets_of_coords = coordinates_array.dimension(1);  //this is linked to the bucket size
+    	for ( int i=0 ; i < num_sets_of_coords ; ++i )
+    	{
+    		const unsigned node_id = bucket[i].identifier();
+    		const unsigned index = node_id - 1;
+    		x[index] = coordinates_array(0,i);
+    		y[index] = coordinates_array(1,i);
+    		if(my_num_dim > 2)
+    			z[index] = coordinates_array(2,i);
+    	}
+    }
+
+    //	int error;
+    error = ex_put_coord (my_output_exoid, x, y, z);
+    char * coord_names[3];
+    coord_names[0] = (char*)"xcoor";
+    coord_names[1] = (char*)"ycoor";
+    coord_names[2] = (char*)"zcoor";
+    error = ex_put_coord_names (my_output_exoid, coord_names);
 }
+
+
 
 void
 Mesh_Manager::write_elem_map()
@@ -623,7 +671,7 @@ Mesh_Manager::write_elem_map()
 	string method_name = "Mesh_Manager::write_elem_map()";
 	stringstream oss;
 	oss << "Writing element map";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	error = ex_put_map (my_output_exoid, my_elem_map);
@@ -636,7 +684,7 @@ Mesh_Manager::write_elem_blocks()
 	string method_name = "Mesh_Manager::write_elem_blocks()";
 	stringstream oss;
 	oss << "Writing element blocks";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	for(int i=0; i<my_num_elem_blk;++i)
@@ -660,7 +708,7 @@ Mesh_Manager::write_elem_connectivities()
 	string method_name = "Mesh_Manager::write_elem_connectivity()";
 	stringstream oss;
 	oss << "Writing element connectivity";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	int * connect;
@@ -679,7 +727,7 @@ Mesh_Manager::write_node_sets()
 	string method_name = "Mesh_Manager::write_node_sets()";
 	stringstream oss;
 	oss << "Writing node sets";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 
 	int error;
@@ -701,7 +749,7 @@ Mesh_Manager::write_side_sets()
 	string method_name = "Mesh_Manager::write_side_sets()";
 	stringstream oss;
 	oss << "Writing side sets";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	for(int i=0; i<my_num_side_sets;++i)
@@ -720,7 +768,7 @@ Mesh_Manager::write_qa_records()
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_qa_records()";
 	oss << "Writing Q & A records";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	char *qa_record[1][4];
@@ -755,7 +803,7 @@ Mesh_Manager::write_variable_names()
 	string method_name = "Mesh_Manager::write_variable_names()";
 	stringstream oss;
 	oss << "Writing variable names";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	int num_global_variables = my_global_variable_names.size();
@@ -791,7 +839,7 @@ Mesh_Manager::write_time_step_info(const int & time_step_num, const float & time
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_time_step_info()";
 	oss << "Writing time step info to output";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 
@@ -810,7 +858,7 @@ Mesh_Manager::update_output()
 	string method_name = "Mesh_Manager::update_output()";
 	stringstream oss;
 	oss << "Updating output";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	/* update the data file; this should be done at the end of every time step * to ensure that no data is lost if the analysis dies */
@@ -824,7 +872,7 @@ Mesh_Manager::write_global_variables_to_output(const int & time_step, const floa
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_global_variables_to_output()";
 	oss << "Writing global variables to output";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 
@@ -844,7 +892,7 @@ Mesh_Manager::write_nodal_variable_to_output(const int & time_step, const float 
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_nodal_variable_to_output()";
 	oss << "Writing nodal variable to output";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 
@@ -863,7 +911,7 @@ Mesh_Manager::write_element_variable_to_output(const int & time_step, const floa
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_element_variable_to_output()";
 	oss << "Writing element variable to output";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 	int error;
 	if(!my_output_initialized)
@@ -918,72 +966,71 @@ bool gather_field_data( unsigned expected_num_rel, const field_type & field ,
 
 
 bool
-Mesh_Manager::verify_coordinates_field(Log & log, const stk::mesh::STK_Mesh & mesh )
+Mesh_Manager::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh )
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::verify_coordinates_field()";
 	oss << "Verifying the coordinates in the STK mesh...";
-	progress_message(&oss,method_name);
+	progress_message(my_log,&oss,method_name);
 #endif
 
-  bool result = true;
+	bool result = true;
 
-  const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
-  const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
+	const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
+	const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
 
-  // All element buckets:
-  const std::vector<stk::mesh::Bucket*> & elem_buckets =
-    bulkData.buckets( stk::mesh::fem::element_rank(mesh.my_fem) );
+	// All element buckets:
+	const std::vector<stk::mesh::Bucket*> & elem_buckets =
+			bulkData.buckets( stk::mesh::fem::element_rank(mesh.my_fem) );
 
-  // Verify coordinates_field by gathering the nodal coordinates
-  // from each element's nodes.
-  for ( std::vector<stk::mesh::Bucket*>::const_iterator
-        element_bucket_it = elem_buckets.begin();
-        element_bucket_it != elem_buckets.end() ; ++element_bucket_it ) {
+	// Verify coordinates_field by gathering the nodal coordinates
+	// from each element's nodes.
+	for ( std::vector<stk::mesh::Bucket*>::const_iterator
+			element_bucket_it = elem_buckets.begin();
+			element_bucket_it != elem_buckets.end() ; ++element_bucket_it ) {
 
-    const stk::mesh::Bucket& bucket = **element_bucket_it;
-    const size_t num_buckets = bucket.size();
-	  const CellTopologyData * cellTopologyData =
-	  		stk::mesh::fem::get_cell_topology(bucket).getCellTopologyData();
+		const stk::mesh::Bucket& bucket = **element_bucket_it;
+		const size_t num_buckets = bucket.size();
+		const CellTopologyData * cellTopologyData =
+				stk::mesh::fem::get_cell_topology(bucket).getCellTopologyData();
 
-	  const int num_nodes = cellTopologyData->node_count;
-    const int & dim = mesh.my_spatial_dimension;
-    double elem_coord[ num_nodes ][ dim ];
+		const int num_nodes = cellTopologyData->node_count;
+		const int & dim = mesh.my_spatial_dimension;
+		double elem_coord[ num_nodes ][ dim ];
 
-    for( size_t bucket_index = 0; bucket_index < num_buckets; ++bucket_index) {
-      const stk::mesh::Entity & elem = bucket[bucket_index] ;
-
-      #ifdef DEBUG_OUTPUT
-      oss << "Element " << elem.identifier();
-      sub_sub_progress_message(&oss);
-#endif
-
-      const bool gather_result =
-        gather_field_data
-        ( num_nodes, coordinates_field , elem , & elem_coord[0][0], NODE_RANK, dim );
-
-
-      if ( gather_result == false ) {
-    	  oss << "verify_coordinates_field() gather was not successful";
-    	  error_message(std::cerr, &oss);
-    	  exit(1);
-      }
+		for( size_t bucket_index = 0; bucket_index < num_buckets; ++bucket_index) {
+			const stk::mesh::Entity & elem = bucket[bucket_index] ;
 
 #ifdef DEBUG_OUTPUT
-      for (int node_index=0 ; node_index<num_nodes ; ++node_index )
-      {
-    	  log << "                   node " << node_index + 1 << ": ";
-    	  for (int coord_index=0 ; coord_index<dim ; ++coord_index) {
-    		  log << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
-    	  }
-    	  log << endl;
-      }
+			oss << "Element " << elem.identifier();
+			sub_sub_progress_message(my_log, &oss);
 #endif
-    }
-  }
 
-  return result;
+			const bool gather_result =
+					gather_field_data
+					( num_nodes, coordinates_field , elem , & elem_coord[0][0], NODE_RANK, dim );
+
+
+			if ( gather_result == false ) {
+				oss << "verify_coordinates_field() gather was not successful";
+				error_message(std::cerr, &oss);
+				exit(1);
+			}
+
+#ifdef DEBUG_OUTPUT
+			for (int node_index=0 ; node_index<num_nodes ; ++node_index )
+			{
+				my_log << "                   node " << node_index + 1 << ": ";
+				for (int coord_index=0 ; coord_index<dim ; ++coord_index) {
+					my_log << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
+				}
+				my_log << endl;
+			}
+#endif
+		}
+	}
+	return result;
 }
 
 

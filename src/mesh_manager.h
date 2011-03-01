@@ -17,7 +17,7 @@
 
 class Mesh_Manager {
 public:
-	Mesh_Manager(const char * input_file_name, const char * output_file_name);
+	Mesh_Manager(const char * input_file_name, const char * output_file_name, Log & log);
 	~Mesh_Manager();
 
 	void populate_STK_mesh(stk::mesh::STK_Mesh * const mesh);
@@ -31,12 +31,11 @@ public:
 			const int * connectivity);
 	void map_node_coordinates(
 			stk::mesh::EntityId node_id,
-			double coord[],
-			const int spatial_dim);
-	bool verify_coordinates_field(Log & log, const stk::mesh::STK_Mesh & mesh);
+			double coord[]);
+	bool verify_coordinates_field(const stk::mesh::STK_Mesh & mesh);
 
-	void read_mesh(Log & log);
-	void initialize_output(const char * title);
+	void read_mesh();
+	void initialize_output(const char * title, const stk::mesh::STK_Mesh & mesh);
 	void insert_global_var_name(const char * name) {
 		my_global_variable_names.push_back(name);
 	}
@@ -102,16 +101,16 @@ public:
 	}
 
 private:
-	void initialize_read(Log & log);
+	void initialize_read();
 	void import_nodes();
 	void import_elem_map();
 	void import_blocks();
 	void import_connectivities();
-	void print_connectivity(Log & log, const int & block_id);
+	void print_connectivity(const int & block_id);
 	void import_node_sets();
 	void import_side_sets();
 
-	void write_coordinates();
+	void write_coordinates(const stk::mesh::STK_Mesh & mesh);
 	void write_elem_map();
 	void write_elem_blocks();
 	void write_elem_connectivities();
@@ -170,6 +169,8 @@ private:
 
 	bool my_output_initialized;
 	bool my_input_initialized;
+
+	Log & my_log;
 };
 
 #endif /* MESH_MANAGER_H_ */
