@@ -19,7 +19,9 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name,log);
 	mesh_manager.read_mesh();
 
-    stk::ParallelMachine parallel_machine = stk::parallel_machine_init(&argc, &argv);
+	// Note: we make this static so that drive_simulation can be called multiple times
+	// FIXME: there's probably a better way to handle this.
+	static stk::ParallelMachine parallel_machine = stk::parallel_machine_init(&argc, &argv);
     stk::mesh::STK_Mesh stk_mesh(parallel_machine, mesh_manager.dimension());
 
     mesh_manager.populate_STK_mesh(&stk_mesh);
@@ -100,6 +102,5 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
     mesh_manager.close_output_file();
 
 	success_message(log);
-
 	return 0;
 }
