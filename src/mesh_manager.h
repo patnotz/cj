@@ -13,11 +13,10 @@
 #include "exodusII.h"
 
 #include <stk_mesh.h>
-#include <log.h>
 
 class Mesh_Manager {
 public:
-	Mesh_Manager(const char * input_file_name, const char * output_file_name, Log & log);
+	Mesh_Manager(const char * input_file_name, const char * output_file_name);
 	~Mesh_Manager();
 
 	void populate_STK_mesh(stk::mesh::STK_Mesh * const mesh);
@@ -169,8 +168,6 @@ private:
 
 	bool my_output_initialized;
 	bool my_input_initialized;
-
-	Log & my_log;
 };
 
 #endif /* MESH_MANAGER_H_ */

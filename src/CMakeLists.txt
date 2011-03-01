@@ -10,6 +10,7 @@ add_subdirectory(jsoncpp-0.5.0)
 SET(SOURCES
 	cj_main.cpp
 	drive_simulation.cpp
+	log.cpp
 	messages.cpp 
 	mesh_manager.cpp
 	stk_mesh.cpp
