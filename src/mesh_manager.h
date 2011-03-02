@@ -77,18 +77,22 @@ public:
 			return 0;
 	}
 
-	void
-			write_time_step_info(const int & time_step_num, const float & time_value);
+	void write_time_step_info(const int & time_step_num, const float & time_value);
 	void update_output();
 	void write_global_variables_to_output(
 			const int & time_step,
 			const float & time_value,
 			const float * global_var_vals);
+//	void write_fields_to_output(
+//			const int & time_step,
+//			const float & time_value,
+//			const stk::mesh::STK_Mesh & mesh);
 	void write_nodal_variable_to_output(
 			const int & time_step,
 			const float & time_value,
 			const float * nodal_var_vals,
 			const int & node_var_index);
+
 	void write_element_variable_to_output(
 			const int & time_step,
 			const float & time_value,

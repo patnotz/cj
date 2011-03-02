@@ -885,6 +885,44 @@ Mesh_Manager::write_global_variables_to_output(const int & time_step, const floa
 	error = ex_put_glob_vars (my_output_exoid, time_step, num_glo_vars, global_var_vals);
 }
 
+
+//void
+//Mesh_Manager::write_fields_to_output(const int & time_step, const float & time_value, const stk::mesh::STK_Mesh & mesh)
+//{
+//	stringstream oss;
+//#ifdef DEBUG_OUTPUT
+//	string method_name = "Mesh_Manager::write_fields_to_output()";
+//	oss << "Writing fields variable to output";
+//	progress_message(my_log,&oss,method_name);
+//#endif
+//	int error;
+//	if(!my_output_initialized)
+//	{
+//		oss << "Output file is not initialized, can't write fields to file: " << my_output_file_name;
+//		error_message(std::cerr, &oss);
+//	}
+//
+//    const stk::mesh::FieldVector & fields = mesh.my_metaData.get_fields();
+//    unsigned nfields = fields.size();
+//    for (unsigned ifld = 0; ifld < nfields; ifld++)
+//      {
+//        stk::mesh::FieldBase *field = fields[ifld];
+//#ifdef DEBUG_OUTPUT
+//        oss << "Writing field " << field->name() << " of rank " << field->rank() << " and entity rank " << FIXME <<  " to output";
+//        sub_progress_message(my_log,&oss);
+//#endif
+//      }
+//
+////	for (int k=0; k<num_nod_vars; k++)
+////	{
+////		for (int j=0; j<num_nodes; j++)
+////		{
+////			nodal_var_vals[j] = (float)k + ((float)(j+1) * time_value);
+////		}
+////		error = ex_put_nodal_var (my_output_exoid, time_step, node_var_index, my_num_nodes, nodal_var_vals);
+////	}
+//}
+
 void
 Mesh_Manager::write_nodal_variable_to_output(const int & time_step, const float & time_value, const float * nodal_var_vals, const int & node_var_index)
 {

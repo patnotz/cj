@@ -34,10 +34,10 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 
 	//  CREATE BOGUS FIELDS FOR NOW the following is not linked to stk mesh stuff above yet
 
-    const char * glo_var_1 = (const char *)"test_global_var_1";
-    const char * glo_var_2 = (const char *)"test_global_var_2";
-    mesh_manager.insert_global_var_name(glo_var_1);
-    mesh_manager.insert_global_var_name(glo_var_2);
+//    const char * glo_var_1 = (const char *)"test_global_var_1";
+//    const char * glo_var_2 = (const char *)"test_global_var_2";
+//    mesh_manager.insert_global_var_name(glo_var_1);
+//    mesh_manager.insert_global_var_name(glo_var_2);
     const char * node_var_1 = (const char *)"test_nodal_var_1";
     const char * node_var_2 = (const char *)"test_nodal_var_2";
     mesh_manager.insert_nodal_var_name(node_var_1);
@@ -50,7 +50,7 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 	const char * title = resultsFileName.c_str();
 	mesh_manager.initialize_output(title,stk_mesh);
 
-	const int num_glo_vars = mesh_manager.num_global_variables();
+//	const int num_glo_vars = mesh_manager.num_global_variables();
 	const int num_nod_vars = mesh_manager.num_nodal_variables();
 	const int num_ele_vars = mesh_manager.num_element_variables();
 	const int num_blocks = mesh_manager.num_blocks();
@@ -60,7 +60,7 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
     const int CPU_word_size = mesh_manager.cpu_word_size();
     const int IO_word_size = mesh_manager.io_word_size();
 
-	float glob_var_vals[num_glo_vars];
+//	float glob_var_vals[num_glo_vars];
 	float nodal_var_vals[num_nodes];
 
 	int time_step = 1;
@@ -69,11 +69,13 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 	{
 		float time_value = (float)(i+1)/100.0;
 		mesh_manager.write_time_step_info(time_step,time_value);
-		for (int j=0; j<num_glo_vars; j++)
-		{
-			glob_var_vals[j] = (float)(j+1) * time_value;
-		}
-		mesh_manager.write_global_variables_to_output(time_step,time_value,glob_var_vals);
+//		for (int j=0; j<num_glo_vars; j++)
+//		{
+//			glob_var_vals[j] = (float)(j+1) * time_value;
+//		}
+//		mesh_manager.write_global_variables_to_output(time_step,time_value,glob_var_vals);
+
+//		mesh_manager.write_fields_to_output(time_step,time_value,stk_mesh);
 		for (int k=0; k<num_nod_vars; k++)
 		{
 			for (int j=0; j<num_nodes; j++)

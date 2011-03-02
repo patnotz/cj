@@ -24,7 +24,7 @@ namespace stk {
 namespace mesh {
 
 typedef stk::mesh::Field<double,stk::mesh::Cartesian> VectorFieldType ;
-//typedef stk::mesh::Field<double>                      ScalarFieldType ;
+typedef stk::mesh::Field<double>                      ScalarFieldType ;
 
 class STK_Mesh
 {
@@ -37,9 +37,11 @@ public:
   stk::mesh::MetaData            my_metaData;
   stk::mesh::BulkData            my_bulkData;
   stk::mesh::DefaultFEM          my_fem;
-  PartVector my_parts;
+  PartVector                     my_parts;
+  const stk::mesh::EntityRank    my_elem_rank;
   VectorFieldType &              my_coordinates_field;
-//  ScalarFieldType &              my_volume_field;
+  ScalarFieldType &              my_temperature_field;
+  ScalarFieldType &              my_volume_field;
 };
 
 } //namespace mesh
