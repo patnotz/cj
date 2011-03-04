@@ -47,10 +47,10 @@ int main( int argc, char * argv[] )
 
 	// Setup the output log file. A file name of "-" causes the code
 	// to use standard output.
+	std::ofstream logFile;
 	if ( logFileName == "-") {
 		Log::setLog(std::cout);
 	} else {
-		std::ofstream logFile;
 		logFile.open(logFileName.c_str());
 		Log::setLog(logFile);
 	}
