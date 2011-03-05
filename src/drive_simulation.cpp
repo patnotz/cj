@@ -7,16 +7,16 @@
 
 using namespace std;
 
-int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
+int drive_simulation(Json::Value & config, int argc, char * argv[] )
 {
-	start_message(log);
+	start_message();
 
 	std::string meshFileName = config["mesh-database"].asString();
 	std::string resultsFileName = config["results-database"].asString();
 	const char* mesh_input_file_name = meshFileName.c_str();
 	const char* mesh_output_file_name = resultsFileName.c_str();
 
-	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name,log);
+	Mesh_Manager mesh_manager = Mesh_Manager(mesh_input_file_name, mesh_output_file_name);
 	mesh_manager.read_mesh();
 
 	// Note: we make this static so that drive_simulation can be called multiple times
@@ -30,7 +30,7 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
     local_status = mesh_manager.verify_coordinates_field(stk_mesh);
     stringstream oss;
     oss << "Verifying the STK mesh coordinates field: ";
-    printStatus(log, local_status, &oss);
+    printStatus(local_status, &oss);
 
 	//  CREATE BOGUS FIELDS FOR NOW the following is not linked to stk mesh stuff above yet
 
@@ -103,6 +103,6 @@ int drive_simulation(Json::Value & config, Log & log, int argc, char * argv[] )
 
     mesh_manager.close_output_file();
 
-	success_message(log);
+	success_message();
 	return 0;
 }

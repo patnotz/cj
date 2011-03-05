@@ -47,18 +47,19 @@ int main( int argc, char * argv[] )
 
 	// Setup the output log file. A file name of "-" causes the code
 	// to use standard output.
-	Log *logPtr = NULL;
 	std::ofstream logFile;
 	if ( logFileName == "-") {
-		logPtr = & std::cout;
+		Log::setLog(std::cout);
 	} else {
 		logFile.open(logFileName.c_str());
-		logPtr = & logFile;
+		Log::setLog(logFile);
 	}
-	Log & log = *logPtr;
+	// Set the error and warning streams too. We don't have options for these.
+	Log::setWarning(std::cout);
+	Log::setError(std::cerr);
 
 	// Parse the input file
-    log << "Using input file " << inputFileName << std::endl;
+    log() << "Using input file " << inputFileName << std::endl;
 	std::ifstream inputFile;
 	inputFile.open(inputFileName.c_str());
 	Json::Value config;
@@ -73,17 +74,17 @@ int main( int argc, char * argv[] )
 	if ( vm.count("mesh")) {
 		const std::string meshFileName = vm["mesh"].as<std::string>();
 		config["mesh-database"] = meshFileName;
-		log << "Override input mesh file name: " << meshFileName << std::endl;
+		log() << "Override input mesh file name: " << meshFileName << std::endl;
 	}
 
 	// If the user requested an alternate output mesh, override the input file:
 	if ( vm.count("results")) {
 		const std::string resultsFileName = vm["results"].as<std::string>();
 		config["results-database"] = resultsFileName;
-		log << "Override output results file name: " << resultsFileName << std::endl;
+		log() << "Override output results file name: " << resultsFileName << std::endl;
 	}
 
     // Run the actual simulation
-	const int error_code = drive_simulation(config, log, argc, argv);
+	const int error_code = drive_simulation(config, argc, argv);
 	return error_code;
 }
