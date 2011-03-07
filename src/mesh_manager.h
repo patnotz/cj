@@ -1,17 +1,9 @@
-/*
- * mesh_manager.h
- *
- *  Created on: Jan 30, 2011
- *      Author: dzturne1
- */
 #ifndef MESH_MANAGER_H_
 #define MESH_MANAGER_H_
 
 #include <vector>
 #include <map>
-
 #include "exodusII.h"
-
 #include <stk_mesh.h>
 
 class Mesh_Manager {
@@ -19,7 +11,14 @@ public:
 	Mesh_Manager(const char * input_file_name, const char * output_file_name);
 	~Mesh_Manager();
 
-	void populate_STK_mesh(stk::mesh::STK_Mesh * const mesh);
+	void print_field_info(stk::mesh::STK_Mesh * const stk_mesh);
+
+	void populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,stk::mesh::ScalarFieldType & field, const stk::mesh::EntityRank & rank);
+	void populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,stk::mesh::VectorFieldType & field, const stk::mesh::EntityRank & rank);
+
+	void populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh);
+	void populate_mesh_elements(stk::mesh::STK_Mesh * const mesh);
+	void initialize_mesh_parts_and_commit(stk::mesh::STK_Mesh * const mesh);
 	stk::mesh::Part * const
 	part_pointer(stk::mesh::STK_Mesh * const mesh, const std::string & elem_type, const std::string & name);
 	void map_node_ids(
@@ -34,13 +33,24 @@ public:
 	bool verify_coordinates_field(const stk::mesh::STK_Mesh & mesh);
 
 	void read_mesh();
-	void initialize_output(const char * title, const stk::mesh::STK_Mesh & mesh);
+	void initialize_output(const char * title, stk::mesh::STK_Mesh & mesh);
 	void insert_global_var_name(const char * name) {
 		my_global_variable_names.push_back(name);
 	}
-	void insert_nodal_var_name(const char * name) {
+	void insert_nodal_var_name(const char * name)
+	{
+		for(int i=0;i<my_nodal_variable_names.size();++i)
+		{
+			if(my_nodal_variable_names[i]==name)
+				return;
+		}
 		my_nodal_variable_names.push_back(name);
 	}
+    int get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,const std::string & name, const std::string & component);
+    int get_element_variable_index(stk::mesh::STK_Mesh * const mesh,const std::string & name, const std::string & component);
+
+    std::vector<std::string> get_field_names(stk::mesh::STK_Mesh * const mesh, stk::mesh::EntityRank entity_rank, unsigned field_rank);
+
 	void insert_element_var_name(const char * name) {
 		my_element_variable_names.push_back(name);
 	}
@@ -60,12 +70,6 @@ public:
 	const int num_elem() {
 		return my_num_elem;
 	}
-	const int cpu_word_size() {
-		return my_CPU_word_size;
-	}
-	const int io_word_size() {
-		return my_IO_word_size;
-	}
 	const int num_blocks() {
 		return my_num_elem_blk;
 	}
@@ -82,10 +86,7 @@ public:
 			const int & time_step,
 			const float & time_value,
 			const float * global_var_vals);
-//	void write_fields_to_output(
-//			const int & time_step,
-//			const float & time_value,
-//			const stk::mesh::STK_Mesh & mesh);
+
 	void write_nodal_variable_to_output(
 			const int & time_step,
 			const float & time_value,
@@ -102,6 +103,12 @@ public:
 	const int dimension() {
 		return my_num_dim;
 	}
+	void write_nodal_scalar(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::ScalarFieldType & field);
+	void write_nodal_vector(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::VectorFieldType & field);
+	void write_element_scalar(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::ScalarFieldType & field);
+	void write_element_vector(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::VectorFieldType & field);
+
+	bool bucket_blocks_contain_block(const stk::mesh::Bucket & bucket, const std::string & name);
 
 private:
 	void initialize_read();
@@ -114,19 +121,17 @@ private:
 	void import_side_sets();
 
 	void write_coordinates(const stk::mesh::STK_Mesh & mesh);
+	void write_nodal_vector(const stk::mesh::STK_Mesh & mesh,const stk::mesh::VectorFieldType & field);
 	void write_elem_map();
-	void write_elem_blocks();
+	void write_elem_blocks(const stk::mesh::STK_Mesh & mesh);
 	void write_elem_connectivities();
 	void write_node_sets();
 	void write_side_sets();
 	void write_qa_records();
-	void write_variable_names();
+	void write_variable_names(stk::mesh::STK_Mesh * const  mesh);
 
 	const char * my_input_file_name;
 	const char * my_output_file_name;
-
-	int my_IO_word_size;
-	int my_CPU_word_size;
 
 	int my_input_exoid;
 	int my_num_nodes;
@@ -167,8 +172,6 @@ private:
 	std::vector<const char *> my_global_variable_names;
 	std::vector<const char *> my_nodal_variable_names;
 	std::vector<const char *> my_element_variable_names;
-	//int my_num_edge_variables;
-	//int my_num_face_variables;
 
 	bool my_output_initialized;
 	bool my_input_initialized;

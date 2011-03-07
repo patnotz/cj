@@ -1,11 +1,5 @@
-/*
- * mesh_manager.cpp
- *
- *  Created on: Jan 30, 2011
- *      Author: dzturne1
- */
-
 #include <stdlib.h>
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -24,9 +18,8 @@
 #include <exodusII.h>
 #include <netcdf.h>
 
-using stk::mesh::fem::NODE_RANK;
-
 using namespace std;
+using stk::mesh::contain;
 
 Mesh_Manager::Mesh_Manager(const char * input_file_name, const char * output_file_name)
 :  my_input_file_name(input_file_name),
@@ -39,13 +32,13 @@ Mesh_Manager::~Mesh_Manager()
 {}
 
 void
-Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
+Mesh_Manager::initialize_mesh_parts_and_commit(stk::mesh::STK_Mesh * const mesh)
 {
 	stringstream oss;
 #ifdef DEBUG_OUTPUT
-	string method_name = "Mesh_Manager::populate_STK_mesh()";
-	oss << "Populating STK mesh";
-	progress_message(oss, method_name);
+	string method_name = "Mesh_Manager::initialize_mesh_parts()";
+	oss << "Initializing mesh parts";
+	progress_message(&oss, method_name);
 #endif
 	if(!my_input_initialized)
 	{
@@ -79,6 +72,157 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	oss << "Mesh committed, adding the elements";
 	sub_progress_message(&oss);
 #endif
+}
+
+std::vector<std::string>
+Mesh_Manager::get_field_names(stk::mesh::STK_Mesh * const mesh, stk::mesh::EntityRank entity_rank, unsigned field_rank)
+{
+	std::vector<std::string> nodal_vars_vec;
+	const stk::mesh::FieldVector & fields =  mesh->my_metaData.get_fields();
+	unsigned nfields = fields.size();
+	//std::cout << "Number of fields = " << fields.size() << std::endl;
+	for (unsigned ifld = 0; ifld < nfields; ifld++)
+	{
+		stk::mesh::FieldBase *field = fields[ifld];
+		//std::cout << "Field[" << ifld << "]= " << field->name() << " rank= " << field->rank() << std::endl;
+		//std::cout << "info>    " << *field << std::endl;
+		if(field->rank() == field_rank) // scalar or vector
+		{
+			unsigned nfr = field->restrictions().size();
+			//std::cout << "number of field restrictions= " << nfr << std::endl;
+			for (unsigned ifr = 0; ifr < nfr; ifr++)
+			{
+				const stk::mesh::FieldRestriction & fr = field->restrictions()[ifr];
+				//std::cout << fr.key.rank();
+				if (fr.type() == entity_rank)  // nodal, element, etc.
+				{
+					string field_name = field->name();
+					//std::cout << "this is the field name: " << field_name << endl;
+					nodal_vars_vec.push_back(field_name);
+					//std::cout << "Field[" << ifld << "]= " << field->name() << std::endl;
+				}
+			}
+		}
+	}
+	return nodal_vars_vec;
+}
+
+void
+Mesh_Manager::print_field_info(stk::mesh::STK_Mesh * const stk_mesh)
+{
+	log() << "  =============== REGISTERED NODAL SCALAR FIELDS ===============" << endl;
+	std::vector<std::string> nodal_scalar_fields = get_field_names(stk_mesh,stk::mesh::fem::node_rank(stk_mesh->my_fem),0);
+    for(int i =0;i<nodal_scalar_fields.size();++i)
+    {
+    	log() << "  "  << nodal_scalar_fields[i] << endl;
+    }
+	log() << "  =============== REGISTERED NODAL VECTOR FIELDS ===============" << endl;
+	std::vector<std::string> nodal_vector_fields = get_field_names(stk_mesh,stk::mesh::fem::node_rank(stk_mesh->my_fem),1);
+    for(int i =0;i<nodal_vector_fields.size();++i)
+    {
+    	log() << "  "  << nodal_vector_fields[i] + "_x"  << endl;
+    	log() << "  "  << nodal_vector_fields[i] + "_y"  << endl;
+    	if(stk_mesh->my_spatial_dimension>2)
+        	log() << "  "  << nodal_vector_fields[i] + "_z"  << endl;
+    }
+	log() << "  ============== REGISTERED ELEMENT SCALAR FIELDS ==============" << endl;
+	std::vector<std::string> element_scalar_fields = get_field_names(stk_mesh,stk::mesh::fem::element_rank(stk_mesh->my_fem),0);
+    for(int i =0;i<element_scalar_fields.size();++i)
+    {
+    	log() << "  "  << element_scalar_fields[i] << endl;
+    }
+	log() << "  ============== REGISTERED ELEMENT VECTOR FIELDS ==============" << endl;
+	std::vector<std::string> element_vector_fields = get_field_names(stk_mesh,stk::mesh::fem::element_rank(stk_mesh->my_fem),1);
+    for(int i =0;i<element_vector_fields.size();++i)
+    {
+    	log() << "  "  <<  element_vector_fields[i] << endl;
+    }
+    log() << "  ==============================================================" << endl;
+}
+
+int
+Mesh_Manager::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh, const std::string & name, const std::string & component)
+{
+	string comp = "";
+	if(component != "")
+		comp = "_" + component;
+	// this needs to be improved... right now the exodusII file does not differente between scalars and vectors for the variable names
+    // so we have to concatinate the list like this
+    // build up the list
+	std::vector<std::string> nodal_scalar_fields = get_field_names(mesh,stk::mesh::fem::node_rank(mesh->my_fem),0);
+	std::vector<std::string> nodal_vector_fields = get_field_names(mesh,stk::mesh::fem::node_rank(mesh->my_fem),1);
+	int num_nodal_scalar_variables = nodal_scalar_fields.size();
+	int num_nodal_vector_variables = nodal_vector_fields.size();
+	int num_nodal_variables = num_nodal_scalar_variables + num_nodal_vector_variables;
+	std::vector<std::string> nodal_var_names;
+	for(int i=0; i<num_nodal_scalar_variables;++i)
+	{
+        nodal_var_names.push_back(nodal_scalar_fields[i]);
+	}
+	for(int i=0; i<num_nodal_vector_variables;++i)
+	{
+        nodal_var_names.push_back(nodal_vector_fields[i] + "_x");
+        nodal_var_names.push_back(nodal_vector_fields[i] + "_y");
+        if(mesh->my_spatial_dimension > 2)
+            nodal_var_names.push_back(nodal_vector_fields[i] + "_z");
+	}
+
+	// rip through the list looking for the specified field which is broken down by component
+	for(int i =0;i<nodal_var_names.size();++i)
+	{
+		if(nodal_var_names[i]==name + comp)  //FIXME this is case sensitive
+			return i+1;
+	}
+	return -1;
+}
+
+int
+Mesh_Manager::get_element_variable_index(stk::mesh::STK_Mesh * const mesh, const std::string & name, const std::string & component)
+{
+	string comp = "";
+	if(component != "")
+		comp = "_" + component;
+	// this needs to be improved... right now the exodusII file does not differente between scalars and vectors for the variable names
+    // so we have to concatinate the list like this
+    // build up the list
+	std::vector<std::string> element_scalar_fields = get_field_names(mesh,stk::mesh::fem::element_rank(mesh->my_fem),0);
+	std::vector<std::string> element_vector_fields = get_field_names(mesh,stk::mesh::fem::element_rank(mesh->my_fem),1);
+	int num_element_scalar_variables = element_scalar_fields.size();
+	int num_element_vector_variables = element_vector_fields.size();
+	int num_element_variables = num_element_scalar_variables + num_element_vector_variables;
+	std::vector<std::string> element_var_names;
+	for(int i=0; i<num_element_scalar_variables;++i)
+	{
+        element_var_names.push_back(element_scalar_fields[i]);
+	}
+	for(int i=0; i<num_element_vector_variables;++i)
+	{
+        element_var_names.push_back(element_vector_fields[i] + "_x");
+        element_var_names.push_back(element_vector_fields[i] + "_y");
+        if(mesh->my_spatial_dimension > 2)
+            element_var_names.push_back(element_vector_fields[i] + "_z");
+	}
+
+	// rip through the list looking for the specified field which is broken down by component
+	for(int i =0;i<element_var_names.size();++i)
+	{
+		if(element_var_names[i]==name + comp)  //FIXME this is case sensitive
+			return i+1;
+	}
+	return -1;
+}
+
+
+
+void
+Mesh_Manager::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::populate_mesh_elements()";
+	oss << "Populating mesh elements";
+	progress_message(&oss, method_name);
+#endif
 	mesh->my_bulkData.modification_begin(); // Begin modifying the mesh
 	int ele_map_index = 0;
 	for(int block = 0 ; block < my_num_elem_blk; ++block)
@@ -104,7 +248,7 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 			{
 				base = ( ele ) * 8 ;
 			}
-			else if (elem_type == "TETRA")
+			else if (elem_type == "TETRA4")
 			{
 				base = ( ele ) * 4 ;
 			}
@@ -136,13 +280,83 @@ Mesh_Manager::populate_STK_mesh(stk::mesh::STK_Mesh * const mesh)
 	// among processes, verified for consistency, and changes to
 	// parallel shared/ghosted mesh entities are synchronized.
 	mesh->my_bulkData.modification_end();
+}
 
+void
+Mesh_Manager::populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh, stk::mesh::VectorFieldType & field, const stk::mesh::EntityRank & rank)
+{
+	stringstream oss;
 #ifdef DEBUG_OUTPUT
-	oss << "Populating the coordinates field";
-	sub_progress_message(&oss);
+	string method_name = "Mesh_Manager::populate_bogus_vector_field()";
+	oss << "Populating bogus vector field " << field.name();
+	progress_message(&oss, method_name);
+#endif
+    const std::vector<stk::mesh::Bucket*> & buckets =
+    		mesh->my_bulkData.buckets(rank);
+
+    for ( std::vector<stk::mesh::Bucket*>::const_iterator
+    		bucket_it = buckets.begin() ;
+    		bucket_it != buckets.end() ; ++bucket_it )
+    {
+    	const stk::mesh::Bucket & bucket = **bucket_it;
+    	stk::mesh::BucketArray<stk::mesh::VectorFieldType> field_array( field, bucket );
+    	const int num_components = field_array.dimension(0); // this should be linked to the spatial dim
+    	const int num_items_in_bucket = field_array.dimension(1);  //this is linked to the bucket size
+    	for ( int i=0 ; i < num_items_in_bucket ; ++i )
+    	{
+    		const unsigned id = bucket[i].identifier();
+    		double * values = &field_array(0,i);
+    		values[0] = id * 100000.0;
+    		values[1] = id * 100100.0;
+    		if(num_components>2)
+    			values[2] = id * 100200.0;
+    	}
+    }
+}
+
+
+void
+Mesh_Manager::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh, stk::mesh::ScalarFieldType & field, const stk::mesh::EntityRank & rank)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::populate_bogus_scalar_field()";
+	oss << "Populating bogus scalar field " << field.name();
+	progress_message(&oss, method_name);
+#endif
+    const std::vector<stk::mesh::Bucket*> & buckets =
+    		mesh->my_bulkData.buckets(rank);
+
+    for ( std::vector<stk::mesh::Bucket*>::const_iterator
+    		bucket_it = buckets.begin() ;
+    		bucket_it != buckets.end() ; ++bucket_it )
+    {
+    	const stk::mesh::Bucket & bucket = **bucket_it;
+    	stk::mesh::BucketArray<stk::mesh::ScalarFieldType> field_array( field, bucket );
+    	const int num_items_in_bucket = field_array.dimension(0);  //this is linked to the bucket size
+    	for ( int i=0 ; i < num_items_in_bucket ; ++i )
+    	{
+    		const unsigned item_id = bucket[i].identifier();
+    		if(rank == stk::mesh::fem::element_rank(mesh->my_fem))
+    			field_array(i) = item_id * 1050.6;
+    		else
+    			field_array(i) = item_id * 4.6890;
+    	}
+    }
+}
+
+
+void
+Mesh_Manager::populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::populate_mesh_coorindates()";
+	oss << "Populating STK mesh";
+	progress_message(&oss, method_name);
 #endif
     const std::vector<stk::mesh::Bucket*> & node_buckets =
-    		mesh->my_bulkData.buckets(NODE_RANK);
+    		mesh->my_bulkData.buckets(stk::mesh::fem::node_rank(mesh->my_fem));
 
     for ( std::vector<stk::mesh::Bucket*>::const_iterator
     		node_bucket_it = node_buckets.begin() ;
@@ -231,7 +445,7 @@ Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId n
 		node_ids[6] = connectivity[base + 7] ;
 		node_ids[7] = connectivity[base + 3] ;
 	}
-	else if (elem_type == "TETRA")
+	else if (elem_type == "TETRA4")
 	{
 		const unsigned base = ( ele ) * 4 ;
 		node_ids[0] = connectivity[base + 0] ;
@@ -270,7 +484,7 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem
 		stk::mesh::Part & part = stk::mesh::declare_part<shards::Hexahedron<8> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
-	else if (elem_type == "TETRA")
+	else if (elem_type == "TETRA4")
 	{
 		stk::mesh::Part & part = stk::mesh::declare_part<shards::Tetrahedron<4> >(mesh->my_metaData, name);
 		part_ptr = &part;
@@ -296,10 +510,10 @@ Mesh_Manager::read_mesh()
 	int error;
 	float version;
 
-	my_CPU_word_size = 0;
-	my_IO_word_size = 0;
+	int CPU_word_size = 0;
+	int IO_word_size = 0;
 	/*open exodus II file */
-	my_input_exoid = ex_open(my_input_file_name,EX_READ,&my_CPU_word_size,&my_IO_word_size,&version);
+	my_input_exoid = ex_open(my_input_file_name,EX_READ,&CPU_word_size,&IO_word_size,&version);
 	if(my_input_exoid<0)
 	{
 		oss << "Reading mesh failure.";
@@ -563,7 +777,7 @@ Mesh_Manager::import_side_sets()
 }
 
 void
-Mesh_Manager::initialize_output(const char * title, const stk::mesh::STK_Mesh & mesh)
+Mesh_Manager::initialize_output(const char * title, stk::mesh::STK_Mesh & mesh)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_output()";
@@ -574,21 +788,24 @@ Mesh_Manager::initialize_output(const char * title, const stk::mesh::STK_Mesh & 
 
 	int error;
 
-	my_CPU_word_size = 0;
-	my_IO_word_size = 0;
+	int CPU_word_size = 0;
+	int IO_word_size = 0;
 	/* create EXODUS II file */
-	my_output_exoid = ex_create (my_output_file_name,EX_CLOBBER,&my_CPU_word_size, &my_IO_word_size);
+	my_output_exoid = ex_create (my_output_file_name,EX_CLOBBER,&CPU_word_size, &IO_word_size);
 
 	error = ex_put_init (my_output_exoid, title, my_num_dim, my_num_nodes, my_num_elem, my_num_elem_blk, my_num_node_sets, my_num_side_sets);
 
     write_coordinates(mesh);
+    //	const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
+    //    write_nodal_vector(mesh,coordinates_field);
+
     write_elem_map();
-    write_elem_blocks();
+    write_elem_blocks(mesh);
     write_elem_connectivities();
     write_node_sets();
     write_side_sets();
     write_qa_records();
-    write_variable_names();
+    write_variable_names(&mesh);
 
     // Truth table for element variables?
     //	/* write element variable truth table */
@@ -615,24 +832,17 @@ Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
 	progress_message(&oss,method_name);
 #endif
 	int error;
-	//	error = ex_put_coord (my_output_exoid, my_x, my_y, my_z);
-	//	char * coord_names[3];
-	//	coord_names[0] = (char*)"xcoor";
-	//	coord_names[1] = (char*)"ycoor";
-	//	coord_names[2] = (char*)"zcoor";
-	//	error = ex_put_coord_names (my_output_exoid, coord_names);
 
-   float x[my_num_nodes];
-   float y[my_num_nodes];
-   float z[my_num_nodes];
+	float x[my_num_nodes];
+	float y[my_num_nodes];
+	float z[my_num_nodes];
 
 	bool result = true;
 
 	const stk::mesh::VectorFieldType & coordinates_field = mesh.my_coordinates_field ;
 	const stk::mesh::BulkData & bulkData = mesh.my_bulkData ;
-
     const std::vector<stk::mesh::Bucket*> & node_buckets =
-    		mesh.my_bulkData.buckets(NODE_RANK);
+    		mesh.my_bulkData.buckets(stk::mesh::fem::node_rank(mesh.my_fem));
 
     for ( std::vector<stk::mesh::Bucket*>::const_iterator
     		node_bucket_it = node_buckets.begin() ;
@@ -652,8 +862,6 @@ Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
     			z[index] = coordinates_array(2,i);
     	}
     }
-
-    //	int error;
     error = ex_put_coord (my_output_exoid, x, y, z);
     char * coord_names[3];
     coord_names[0] = (char*)"xcoor";
@@ -662,6 +870,186 @@ Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
     error = ex_put_coord_names (my_output_exoid, coord_names);
 }
 
+void
+Mesh_Manager::write_nodal_scalar(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::ScalarFieldType & field)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_nodal_scalar()";
+	oss << "Writing nodal scalar: " << field.name();
+	progress_message(&oss,method_name);
+#endif
+	int error;
+	float values[my_num_nodes];
+	const std::vector<stk::mesh::Bucket*> & node_buckets =
+			mesh.my_bulkData.buckets(stk::mesh::fem::node_rank(mesh.my_fem));
+
+	for ( std::vector<stk::mesh::Bucket*>::const_iterator
+			node_bucket_it = node_buckets.begin() ;
+			node_bucket_it != node_buckets.end() ; ++node_bucket_it )
+	{
+		const stk::mesh::Bucket & bucket = **node_bucket_it;
+		stk::mesh::BucketArray<stk::mesh::ScalarFieldType> field_array( field, bucket );
+		const int num_nodes_in_bucket = field_array.dimension(0);  //this is linked to the bucket size
+		for ( int i=0 ; i < num_nodes_in_bucket ; ++i )
+		{
+			const unsigned node_id = bucket[i].identifier();
+			const unsigned index = node_id - 1;
+			values[index] = field_array(i);
+		}
+	}
+	const int var_index = get_nodal_variable_index(&mesh,field.name(),"");
+	write_nodal_variable_to_output(time_step,time_value,values,var_index);
+}
+
+void
+Mesh_Manager::write_nodal_vector(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::VectorFieldType & field)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_nodal_vector()";
+	oss << "Writing nodal vector: " << field.name();
+	progress_message(&oss,method_name);
+#endif
+	int error;
+	float values[my_num_nodes];
+	const std::vector<stk::mesh::Bucket*> & node_buckets =
+			mesh.my_bulkData.buckets(stk::mesh::fem::node_rank(mesh.my_fem));
+
+	string components[3];
+	components[0] = "x"; components[1] = "y"; components[2] = "z";
+	for(int comp = 0; comp < mesh.my_spatial_dimension; ++comp)
+	{
+		for ( std::vector<stk::mesh::Bucket*>::const_iterator
+				node_bucket_it = node_buckets.begin() ;
+				node_bucket_it != node_buckets.end() ; ++node_bucket_it )
+		{
+			const stk::mesh::Bucket & bucket = **node_bucket_it;
+			stk::mesh::BucketArray<stk::mesh::VectorFieldType> field_array( field, bucket );
+			const int num_nodes_in_bucket = field_array.dimension(1);  //this is linked to the bucket size
+			for ( int i=0 ; i < num_nodes_in_bucket ; ++i )
+			{
+				const unsigned node_id = bucket[i].identifier();
+				const unsigned index = node_id - 1;
+				values[index] = field_array(comp,i);
+			}
+		}
+		const int var_index = get_nodal_variable_index(&mesh,field.name(),components[comp]);
+		write_nodal_variable_to_output(time_step,time_value,values,var_index);
+	}
+
+}
+
+bool
+bucket_blocks_contain_block_named(const stk::mesh::Bucket & bucket, const std::string & name)
+{
+	stk::mesh::PartVector elem_parts;
+	bucket.supersets(elem_parts);
+	for(int i = 0;i<elem_parts.size(); ++i)
+	{
+		if(elem_parts[i]->name() == name) return true;
+	}
+    return false;
+}
+
+
+void
+Mesh_Manager::write_element_scalar(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::ScalarFieldType & field)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_element_scalar()";
+	oss << "Writing element scalar: " << field.name();
+	progress_message(&oss,method_name);
+#endif
+	int error;
+
+	for (int blk=0; blk<num_blocks();blk++)
+	{
+		int array_index = 0;  //reset the index for each block
+		const int num_elements = num_elem_in_block(blk);
+		float values[num_elements];
+		const std::vector<stk::mesh::Bucket*> & elem_buckets =
+				mesh.my_bulkData.buckets(stk::mesh::fem::element_rank(mesh.my_fem)); // get all of the element buckets
+
+		// TODO this could be done more efficiently, but I don't know how yet.
+		// As it is we rip over all the buckets for each block and only keep the
+		// buckets that are part of this block. we need to figure out how to assemble
+		// elements based on the block_id (mesh part)
+
+		for ( std::vector<stk::mesh::Bucket*>::const_iterator
+				elem_bucket_it = elem_buckets.begin() ;
+				elem_bucket_it != elem_buckets.end() ; ++elem_bucket_it )
+		{
+			const stk::mesh::Bucket & bucket = **elem_bucket_it;
+			bool bucket_has_block = bucket_blocks_contain_block_named(bucket, mesh.my_parts[blk]->name());
+			if(!bucket_has_block) continue;
+			// Now populate the array of element values for this block tha come from this bucket
+			stk::mesh::BucketArray<stk::mesh::ScalarFieldType> field_array( field, bucket );
+			const int num_elems_in_bucket = field_array.dimension(0);  //this is linked to the bucket size
+			for ( int i=0 ; i < num_elems_in_bucket ; ++i )
+			{
+				const unsigned elem_id = bucket[i].identifier();
+				//const unsigned index = elem_id - 1;
+				values[array_index] = field_array(i);
+				array_index++;
+			}
+		}
+		const int var_index = get_element_variable_index(&mesh,field.name(),"");
+		write_element_variable_to_output(time_step,time_value,values,var_index,blk);
+	}
+}
+
+void
+Mesh_Manager::write_element_vector(const int & time_step,const float & time_value, stk::mesh::STK_Mesh & mesh,const stk::mesh::VectorFieldType & field)
+{
+	stringstream oss;
+#ifdef DEBUG_OUTPUT
+	string method_name = "Mesh_Manager::write_element_vector()";
+	oss << "Writing element vector: " << field.name();
+	progress_message(&oss,method_name);
+#endif
+	int error;
+
+	string components[3];
+	components[0] = "x"; components[1] = "y"; components[2] = "z";
+	for(int comp = 0; comp < mesh.my_spatial_dimension; ++comp)
+	{
+		for (int blk=0; blk<num_blocks();blk++)
+		{
+			int array_index = 0;
+			const int num_elements = num_elem_in_block(blk);
+			float values[num_elements];
+			const std::vector<stk::mesh::Bucket*> & elem_buckets =
+					mesh.my_bulkData.buckets(stk::mesh::fem::element_rank(mesh.my_fem)); // get all of the element buckets
+
+			// TODO this could be done more efficiently, but I don't know how yet.
+			// As it is we rip over all the buckets for each block and only keep the
+			// buckets that are part of this block. we need to figure out how to assemble
+			// elements based on the block_id (mesh part)
+
+			for ( std::vector<stk::mesh::Bucket*>::const_iterator
+					elem_bucket_it = elem_buckets.begin() ;
+					elem_bucket_it != elem_buckets.end() ; ++elem_bucket_it )
+			{
+				const stk::mesh::Bucket & bucket = **elem_bucket_it;
+
+				bool bucket_has_block = bucket_blocks_contain_block_named(bucket, mesh.my_parts[blk]->name());
+				if(!bucket_has_block) continue;
+				// Now populate the array of element values for this block tha come from this bucket
+				stk::mesh::BucketArray<stk::mesh::VectorFieldType> field_array( field, bucket );
+				const int num_elems_in_bucket = field_array.dimension(1);  //this is linked to the bucket size
+				for ( int i=0 ; i < num_elems_in_bucket ; ++i )
+				{
+					values[array_index] = field_array(comp,i);
+					array_index++;
+				}
+			}
+			const int var_index = get_element_variable_index(&mesh,field.name(),components[comp]);
+			write_element_variable_to_output(time_step,time_value,values,var_index,blk);
+		}
+	}
+}
 
 
 void
@@ -678,7 +1066,7 @@ Mesh_Manager::write_elem_map()
 }
 
 void
-Mesh_Manager::write_elem_blocks()
+Mesh_Manager::write_elem_blocks(const stk::mesh::STK_Mesh & mesh)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_elem_blocks()";
@@ -687,11 +1075,12 @@ Mesh_Manager::write_elem_blocks()
 	progress_message(&oss,method_name);
 #endif
 	int error;
+
 	for(int i=0; i<my_num_elem_blk;++i)
 	{
-		string elem_type_str = my_elem_types.find(my_block_ids[i])->second;
-        char * elem_type = const_cast<char *>(elem_type_str.c_str());
-		error = ex_put_elem_block (my_output_exoid, my_block_ids[i], elem_type, my_num_elem_in_block[i], my_num_nodes_per_elem[i], 0);
+			string elem_type_str = my_elem_types.find(my_block_ids[i])->second;
+	        char * elem_type = const_cast<char *>(elem_type_str.c_str());
+			error = ex_put_elem_block (my_output_exoid, my_block_ids[i], elem_type, my_num_elem_in_block[i], my_num_nodes_per_elem[i], 0);
 		/* write element block properties */
 		//	prop_names[0] = (char*)"TOP"; prop_names[1] = (char*)"RIGHT"; error = ex_put_prop_names(my_output_exoid,EX_ELEM_BLOCK,2,prop_names);
 		//	error = ex_put_prop(my_output_exoid, EX_ELEM_BLOCK, ebids[0], (char*)"TOP", 1);
@@ -797,7 +1186,7 @@ Mesh_Manager::write_qa_records()
 }
 
 void
-Mesh_Manager::write_variable_names()
+Mesh_Manager::write_variable_names(stk::mesh::STK_Mesh * const mesh)
 {
 #ifdef DEBUG_OUTPUT
 	string method_name = "Mesh_Manager::write_variable_names()";
@@ -806,27 +1195,63 @@ Mesh_Manager::write_variable_names()
 	progress_message(&oss,method_name);
 #endif
 	int error;
-	int num_global_variables = my_global_variable_names.size();
-	char* global_var_names[num_global_variables];
-	for(int i=0; i<num_global_variables;++i)
-	{
-        global_var_names[i] = (char *)my_global_variable_names[i];
-	}
-	error = ex_put_var_param (my_output_exoid, (char*)"g", num_global_variables);
-	error = ex_put_var_names (my_output_exoid, (char*)"g", num_global_variables, global_var_names);
-	int num_nodal_variables = my_nodal_variable_names.size();
+    // NODAL fields
+	std::vector<std::string> nodal_scalar_fields = get_field_names(mesh,stk::mesh::fem::node_rank(mesh->my_fem),0);
+	std::vector<std::string> nodal_vector_fields = get_field_names(mesh,stk::mesh::fem::node_rank(mesh->my_fem),1);
+	int num_nodal_scalar_variables = nodal_scalar_fields.size();
+	int num_nodal_vector_variables = nodal_vector_fields.size();
+	int num_nodal_variables = num_nodal_scalar_variables + num_nodal_vector_variables * mesh->my_spatial_dimension;
+	std::vector<std::string> nodal_string_names;
 	char* nodal_var_names[num_nodal_variables];
-	for(int i=0; i<num_nodal_variables;++i)
+	for(int i=0; i<num_nodal_scalar_variables;++i)
 	{
-        nodal_var_names[i] = (char *)my_nodal_variable_names[i];
+		nodal_string_names.push_back(nodal_scalar_fields[i]);
 	}
+	for(int i=0; i<num_nodal_vector_variables;++i)
+	{
+		string x_comp = nodal_vector_fields[i] + "_x";
+		string y_comp = nodal_vector_fields[i] + "_y";
+		string z_comp = nodal_vector_fields[i] + "_z";
+		nodal_string_names.push_back(x_comp);
+		nodal_string_names.push_back(y_comp);
+        if(mesh->my_spatial_dimension>2)
+        	nodal_string_names.push_back(z_comp);
+	}
+	for (int i =0 ;i<num_nodal_variables;++i)
+	{
+		nodal_var_names[i] = (char*)(nodal_string_names[i].c_str());
+	}
+
 	error = ex_put_var_param (my_output_exoid, (char*)"n", num_nodal_variables);
 	error = ex_put_var_names (my_output_exoid, (char*)"n", num_nodal_variables, nodal_var_names);
-	int num_element_variables = my_element_variable_names.size();
+    // ELEMENT fields
+	std::vector<std::string> element_scalar_fields = get_field_names(mesh,stk::mesh::fem::element_rank(mesh->my_fem),0);
+	std::vector<std::string> element_vector_fields = get_field_names(mesh,stk::mesh::fem::element_rank(mesh->my_fem),1);
+	int num_element_scalar_variables = element_scalar_fields.size();
+	int num_element_vector_variables = element_vector_fields.size();
+	int num_element_variables = num_element_scalar_variables + num_element_vector_variables * mesh->my_spatial_dimension;
 	char* ele_var_names[num_element_variables];
-	for(int i=0; i<num_element_variables;++i)
+	std::vector<std::string> element_string_names;
+
+	for(int i=0; i<num_element_scalar_variables;++i)
 	{
-        ele_var_names[i] = (char *)my_element_variable_names[i];
+		element_string_names.push_back(element_scalar_fields[i]);
+
+	}
+	for(int i=0; i<num_element_vector_variables;++i)
+	{
+		string x_comp = element_vector_fields[i] + "_x";
+		string y_comp = element_vector_fields[i] + "_y";
+		string z_comp = element_vector_fields[i] + "_z";
+		element_string_names.push_back(x_comp);
+		element_string_names.push_back(y_comp);
+        if(mesh->my_spatial_dimension>2)
+        	element_string_names.push_back(z_comp);
+
+	}
+	for (int i =0 ;i<num_element_variables;++i)
+	{
+		ele_var_names[i] = (char*)(element_string_names[i].c_str());
 	}
 	error = ex_put_var_param (my_output_exoid, (char*)"e", num_element_variables);
 	error = ex_put_var_names (my_output_exoid, (char*)"e", num_element_variables, ele_var_names);
@@ -884,44 +1309,6 @@ Mesh_Manager::write_global_variables_to_output(const int & time_step, const floa
 	int num_glo_vars = my_global_variable_names.size();
 	error = ex_put_glob_vars (my_output_exoid, time_step, num_glo_vars, global_var_vals);
 }
-
-
-//void
-//Mesh_Manager::write_fields_to_output(const int & time_step, const float & time_value, const stk::mesh::STK_Mesh & mesh)
-//{
-//	stringstream oss;
-//#ifdef DEBUG_OUTPUT
-//	string method_name = "Mesh_Manager::write_fields_to_output()";
-//	oss << "Writing fields variable to output";
-//	progress_message(my_log,&oss,method_name);
-//#endif
-//	int error;
-//	if(!my_output_initialized)
-//	{
-//		oss << "Output file is not initialized, can't write fields to file: " << my_output_file_name;
-//		error_message(std::cerr, &oss);
-//	}
-//
-//    const stk::mesh::FieldVector & fields = mesh.my_metaData.get_fields();
-//    unsigned nfields = fields.size();
-//    for (unsigned ifld = 0; ifld < nfields; ifld++)
-//      {
-//        stk::mesh::FieldBase *field = fields[ifld];
-//#ifdef DEBUG_OUTPUT
-//        oss << "Writing field " << field->name() << " of rank " << field->rank() << " and entity rank " << FIXME <<  " to output";
-//        sub_progress_message(my_log,&oss);
-//#endif
-//      }
-//
-////	for (int k=0; k<num_nod_vars; k++)
-////	{
-////		for (int j=0; j<num_nodes; j++)
-////		{
-////			nodal_var_vals[j] = (float)k + ((float)(j+1) * time_value);
-////		}
-////		error = ex_put_nodal_var (my_output_exoid, time_step, node_var_index, my_num_nodes, nodal_var_vals);
-////	}
-//}
 
 void
 Mesh_Manager::write_nodal_variable_to_output(const int & time_step, const float & time_value, const float * nodal_var_vals, const int & node_var_index)
@@ -1047,7 +1434,7 @@ Mesh_Manager::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh )
 
 			const bool gather_result =
 					gather_field_data
-					( num_nodes, coordinates_field , elem , & elem_coord[0][0], NODE_RANK, dim );
+					( num_nodes, coordinates_field , elem , & elem_coord[0][0], stk::mesh::fem::node_rank(mesh.my_fem), dim );
 
 
 			if ( gather_result == false ) {

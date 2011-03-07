@@ -1,9 +1,3 @@
-/*
- * stk_mesh.h
- *
- *  Created on: Feb 6, 2011
- *      Author: dzturne1
- */
 #ifndef STK_MESH_H_
 #define STK_MESH_H_
 
@@ -34,14 +28,12 @@ public:
   STK_Mesh( stk::ParallelMachine comm, const int & spatial_dim);
 
   const int                      my_spatial_dimension;
-  stk::mesh::MetaData            my_metaData;
-  stk::mesh::BulkData            my_bulkData;
-  stk::mesh::DefaultFEM          my_fem;
+  MetaData                       my_metaData;
+  BulkData                       my_bulkData;
+  DefaultFEM                     my_fem;
   PartVector                     my_parts;
-  const stk::mesh::EntityRank    my_elem_rank;
+  const EntityRank               my_elem_rank;
   VectorFieldType &              my_coordinates_field;
-  ScalarFieldType &              my_temperature_field;
-  ScalarFieldType &              my_volume_field;
 };
 
 } //namespace mesh

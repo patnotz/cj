@@ -24,79 +24,63 @@ int drive_simulation(Json::Value & config, int argc, char * argv[] )
 	static stk::ParallelMachine parallel_machine = stk::parallel_machine_init(&argc, &argv);
     stk::mesh::STK_Mesh stk_mesh(parallel_machine, mesh_manager.dimension());
 
-    mesh_manager.populate_STK_mesh(&stk_mesh);
+	//  CREATE BOGUS FIELDS FOR NOW
+	stk::mesh::Part & universal = stk_mesh.my_metaData.universal_part();
 
+    stk::mesh::ScalarFieldType & temperature_field = stk_mesh.my_metaData.declare_field< stk::mesh::ScalarFieldType >("temperature");
+	stk::mesh::put_field(temperature_field,stk::mesh::fem::node_rank(stk_mesh.my_fem),universal);
+
+	stk::mesh::VectorFieldType & velocity_field = stk_mesh.my_metaData.declare_field< stk::mesh::VectorFieldType >("velocity");
+	stk::mesh::put_field(velocity_field,stk::mesh::fem::node_rank(stk_mesh.my_fem),universal,stk_mesh.my_spatial_dimension);
+
+	stk::mesh::ScalarFieldType & volume_field = stk_mesh.my_metaData.declare_field< stk::mesh::ScalarFieldType >("volume");
+	stk::mesh::put_field(volume_field,stk::mesh::fem::element_rank(stk_mesh.my_fem),universal);
+
+	stk::mesh::VectorFieldType & acceleration_field = stk_mesh.my_metaData.declare_field< stk::mesh::VectorFieldType >("acceleration");
+	stk::mesh::put_field(acceleration_field,stk::mesh::fem::element_rank(stk_mesh.my_fem),universal);
+
+	mesh_manager.initialize_mesh_parts_and_commit(&stk_mesh);
+
+	// This prints the field names that have been defined on all parts (universal)
+    // It could be tailored to print specific parts like sidesets, etc.
+	mesh_manager.print_field_info(&stk_mesh);
+    // put the elements and connectivity in the stk_mesh
+	mesh_manager.populate_mesh_elements(&stk_mesh);
+    // put the coordinates as a field on the stk_mesh
+    mesh_manager.populate_mesh_coordinates(&stk_mesh);
     bool local_status = true ;
     local_status = mesh_manager.verify_coordinates_field(stk_mesh);
     stringstream oss;
     oss << "Verifying the STK mesh coordinates field: ";
     printStatus(local_status, &oss);
 
-	//  CREATE BOGUS FIELDS FOR NOW the following is not linked to stk mesh stuff above yet
-
-//    const char * glo_var_1 = (const char *)"test_global_var_1";
-//    const char * glo_var_2 = (const char *)"test_global_var_2";
-//    mesh_manager.insert_global_var_name(glo_var_1);
-//    mesh_manager.insert_global_var_name(glo_var_2);
-    const char * node_var_1 = (const char *)"test_nodal_var_1";
-    const char * node_var_2 = (const char *)"test_nodal_var_2";
-    mesh_manager.insert_nodal_var_name(node_var_1);
-	mesh_manager.insert_nodal_var_name(node_var_2);
-	const char * ele_var_1 = (const char *)"test_element_var_1";
-	const char * ele_var_2 = (const char *)"test_element_var_2";
-	mesh_manager.insert_element_var_name(ele_var_1);
-	mesh_manager.insert_element_var_name(ele_var_2);
+    // POPULATE BOGUS FIELDS FOR NOW
+    // temperature
+    mesh_manager.populate_bogus_scalar_field(&stk_mesh, temperature_field,stk::mesh::fem::node_rank(stk_mesh.my_fem));
+    // volume
+    mesh_manager.populate_bogus_scalar_field(&stk_mesh, volume_field,stk::mesh::fem::element_rank(stk_mesh.my_fem));
+    // velocity
+    mesh_manager.populate_bogus_vector_field(&stk_mesh, velocity_field,stk::mesh::fem::node_rank(stk_mesh.my_fem));
+    // acceleration
+    mesh_manager.populate_bogus_vector_field(&stk_mesh, acceleration_field,stk::mesh::fem::element_rank(stk_mesh.my_fem));
 
 	const char * title = resultsFileName.c_str();
 	mesh_manager.initialize_output(title,stk_mesh);
 
-//	const int num_glo_vars = mesh_manager.num_global_variables();
-	const int num_nod_vars = mesh_manager.num_nodal_variables();
-	const int num_ele_vars = mesh_manager.num_element_variables();
-	const int num_blocks = mesh_manager.num_blocks();
-
-    const int num_nodes = mesh_manager.num_nodes();
-    const int num_elem = mesh_manager.num_elem();
-    const int CPU_word_size = mesh_manager.cpu_word_size();
-    const int IO_word_size = mesh_manager.io_word_size();
-
-//	float glob_var_vals[num_glo_vars];
-	float nodal_var_vals[num_nodes];
-
 	int time_step = 1;
-	int num_time_steps = 10;
+	int num_time_steps = 1;
 	for (int i=0; i<num_time_steps; i++)
 	{
 		float time_value = (float)(i+1)/100.0;
 		mesh_manager.write_time_step_info(time_step,time_value);
-//		for (int j=0; j<num_glo_vars; j++)
-//		{
-//			glob_var_vals[j] = (float)(j+1) * time_value;
-//		}
-//		mesh_manager.write_global_variables_to_output(time_step,time_value,glob_var_vals);
 
-//		mesh_manager.write_fields_to_output(time_step,time_value,stk_mesh);
-		for (int k=0; k<num_nod_vars; k++)
-		{
-			for (int j=0; j<num_nodes; j++)
-			{
-				nodal_var_vals[j] = (float)k + ((float)(j+1) * time_value);
-			}
-			mesh_manager.write_nodal_variable_to_output(time_step,time_value,nodal_var_vals,k+1);
-		}
-		for (int k=0; k<num_ele_vars; k++)
-		{
-			for (int j=0; j<num_blocks; j++)
-			{
-				const int num_elem_in_block = mesh_manager.num_elem_in_block(j);
-				float elem_var_vals[num_elem_in_block];
-				for (int m=0; m<num_elem_in_block; m++)
-				{
-					elem_var_vals[m] = (float)(k+1) + (float)(j+2) + ((float)(m+1)*time_value);
-				}
-				mesh_manager.write_element_variable_to_output(time_step,time_value,elem_var_vals,k+1,j);
-			}
-		}
+		mesh_manager.write_nodal_scalar(time_step,time_value,stk_mesh,temperature_field);
+		mesh_manager.write_nodal_vector(time_step,time_value,stk_mesh,stk_mesh.my_coordinates_field);
+		mesh_manager.write_nodal_vector(time_step,time_value,stk_mesh,velocity_field);
+
+		mesh_manager.write_element_scalar(time_step,time_value,stk_mesh,volume_field);
+		mesh_manager.write_element_vector(time_step,time_value,stk_mesh,acceleration_field);
+
 		mesh_manager.update_output();
 		time_step++;
 	}

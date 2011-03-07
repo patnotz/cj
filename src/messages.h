@@ -1,10 +1,3 @@
-/*
- * messages.h
- *
- *  Created on: Jan 30, 2011
- *      Author: dzturne1
- */
-
 #ifndef MESSAGES_H_
 #define MESSAGES_H_
 

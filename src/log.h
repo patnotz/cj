@@ -21,4 +21,6 @@ std::ostream & log();
 std::ostream & error();
 std::ostream & warning();
 
+//#define DEBUG_OUTPUT
+
 #endif /* LOG_H_ */

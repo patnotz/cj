@@ -1,9 +1,3 @@
-/*
- * messages.cpp
- *
- *  Created on: Jan 30, 2011
- *      Author: dzturne1
- */
 #include <string>
 #include <sstream>
 #include <time.h>
