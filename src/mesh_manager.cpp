@@ -248,7 +248,7 @@ Mesh_Manager::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
 			{
 				base = ( ele ) * 8 ;
 			}
-			else if (elem_type == "TETRA4")
+			else if (elem_type == "TETRA4" || elem_type == "TETRA")
 			{
 				base = ( ele ) * 4 ;
 			}
@@ -445,7 +445,7 @@ Mesh_Manager::map_node_ids(const int block, const int ele, stk::mesh::EntityId n
 		node_ids[6] = connectivity[base + 7] ;
 		node_ids[7] = connectivity[base + 3] ;
 	}
-	else if (elem_type == "TETRA4")
+	else if (elem_type == "TETRA4" || elem_type == "TETRA")
 	{
 		const unsigned base = ( ele ) * 4 ;
 		node_ids[0] = connectivity[base + 0] ;
@@ -484,7 +484,7 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh, const string & elem
 		stk::mesh::Part & part = stk::mesh::declare_part<shards::Hexahedron<8> >(mesh->my_metaData, name);
 		part_ptr = &part;
 	}
-	else if (elem_type == "TETRA4")
+	else if (elem_type == "TETRA4" || elem_type == "TETRA")
 	{
 		stk::mesh::Part & part = stk::mesh::declare_part<shards::Tetrahedron<4> >(mesh->my_metaData, name);
 		part_ptr = &part;
