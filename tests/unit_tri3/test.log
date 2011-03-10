@@ -1,0 +1,47 @@
+
+   *****************************************************************
+     EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  
+                                                                    
+                         Version: 2.21 (2008-05-13)
+            Authors : Richard Drake, rrdrake@sandia.gov             
+                      Greg Sjaardema, gdsjaar@sandia.gov            
+                                                                    
+     EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  EXODIFF  
+   *****************************************************************
+
+Reading first file ... 
+Reading second file ... 
+  FILE 1: mesh.e
+   Title: 
+          Dim = 2, Blocks = 1, Nodes = 85, Elements = 136, Nodesets = 0, Sidesets = 0
+          Vars: Global = 0, Nodal = 5, Element = 3, Nodeset = 0, Sideset = 0, Times = 1
+
+  FILE 2: ./gold/mesh.e
+   Title: 
+          Dim = 2, Blocks = 1, Nodes = 85, Elements = 136, Nodesets = 0, Sidesets = 0
+          Vars: Global = 0, Nodal = 5, Element = 3, Nodeset = 0, Sideset = 0, Times = 1
+
+Coordinates will be compared .. tol:    1e-06 (absolute), floor:        0
+Time step values will be compared .. tol:    1e-06 (relative), floor:        0
+No Global variables on either file.
+Nodal variables to be compared:
+	temperature                      tol:    1e-06 (relative), floor:        0
+	coordinates_x                            1e-06 (relative),               0
+	coordinates_y                            1e-06 (relative),               0
+	velocity_x                               1e-06 (relative),               0
+	velocity_y                               1e-06 (relative),               0
+Element variables to be compared:
+	volume                           tol:    1e-06 (relative), floor:        0
+	acceleration_x                           1e-06 (relative),               0
+	acceleration_y                           1e-06 (relative),               0
+No Nodeset variables on either file.
+No Sideset variables on either file.
+
+  ==============================================================
+  NOTE: All node and element ids are reported as global ids.
+
+  --------- Time step 1, 9.9999998e-03 ~ 9.9999998e-03, rel diff:  0.00000e+00 ---------
+Nodal variables:
+Element variables:
+
+exodiff: Files are the same

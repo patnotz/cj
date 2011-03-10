@@ -338,7 +338,7 @@ Mesh_Manager::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh, stk:
     	{
     		const unsigned item_id = bucket[i].identifier();
     		if(rank == stk::mesh::fem::element_rank(mesh->my_fem))
-    			field_array(i) = item_id * 1050.6;
+    			field_array(i) = item_id * 1150.6;
     		else
     			field_array(i) = item_id * 4.6890;
     	}
