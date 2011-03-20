@@ -8,7 +8,7 @@ IF (NOT DEFINED CJ_TRILINOS_DIR)
 ENDIF()
 
 # Get Trilinos as one entity
-FIND_PACKAGE(Trilinos PATHS ${CJ_TRILINOS_DIR}/include)
+FIND_PACKAGE(Trilinos PATHS ${CJ_TRILINOS_DIR}/lib/cmake/Trilinos)
 
 IF(NOT Trilinos_FOUND)
   MESSAGE(FATAL_ERROR "Could not find Trilinos!")
