@@ -15,6 +15,7 @@ cmake \
       -D Trilinos_ENABLE_ALL_PACKAGES:BOOL=OFF \
       -D Trilinos_ENABLE_ALL_OPTIONAL_PACKAGES:BOOL=OFF \
 \
+      -D Trilinos_ENABLE_Didasko:BOOL=ON \
       -D Trilinos_ENABLE_Teuchos:BOOL=ON \
       -D Trilinos_ENABLE_Shards:BOOL=ON \
       -D Trilinos_ENABLE_Sacado:BOOL=ON \
@@ -42,12 +43,14 @@ cmake \
       -D Trilinos_ENABLE_Teko:BOOL=ON \
       -D Trilinos_ENABLE_FEI:BOOL=ON\
       -D Trilinos_ENABLE_Zoltan:BOOL=ON\
-      -D Trilinos_ENABLE_Mesquite:BOOL=ON\
+      -D Trilinos_ENABLE_Mesquite:BOOL=OFF\
 \
       -D Trilinos_ENABLE_TESTS:BOOL=OFF \
       -D Trilinos_ENABLE_EXAMPLES:BOOL=OFF \
       -D TPL_ENABLE_MPI:BOOL=ON \
       -D MPI_BASE_DIR:PATH=/opt/local/ \
+      -D TPL_ENABLE_CUDA:BOOL=ON \
+      -D TPL_ENABLE_BinUtils:BOOL=OFF \
       -D TPL_ENABLE_Boost:BOOL=ON \
 \
       -D Phalanx_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
