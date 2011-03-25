@@ -43,6 +43,8 @@ cmake \
       -D Trilinos_ENABLE_FEI:BOOL=ON\
       -D Trilinos_ENABLE_Zoltan:BOOL=ON\
       -D Trilinos_ENABLE_Mesquite:BOOL=ON\
+      -D Trilinos_ENABLE_Tpetra:BOOL=ON \
+      -D Trilinos_ENABLE_Kokkos:BOOL=ON \
 \
       -D Trilinos_ENABLE_TESTS:BOOL=OFF \
       -D Trilinos_ENABLE_EXAMPLES:BOOL=OFF \
@@ -50,7 +52,6 @@ cmake \
       -D MPI_BASE_DIR:PATH=/opt/local/ \
       -D TPL_ENABLE_CUDA:BOOL=ON \
       -D TPL_ENABLE_TBB:BOOL=ON \
-      -D TPL_ENABLE_BinUtils:BOOL=OFF \
       -D TPL_ENABLE_Boost:BOOL=ON \
 \
       -D Phalanx_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
