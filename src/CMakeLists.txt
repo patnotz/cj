@@ -60,3 +60,4 @@ SET(Cj_LIBRARIES
 target_link_libraries(Cj ${Cj_LIBRARIES} ${Boost_LIBRARIES}) 
 
 add_subdirectory(gui)
+add_subdirectory(mpl)
