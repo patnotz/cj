@@ -1,49 +1,76 @@
 #include <iostream>
-#include <boost/mpl/for_each.hpp>
-#include <boost/mpl/vector.hpp>
-#include <boost/mpl/transform.hpp>
+#include <boost/fusion/algorithm.hpp>
+#include <boost/fusion/container.hpp>
 
 using namespace std;
 using namespace boost;
 
 struct A {
-	static void evaluate() { cout << "Hello from A" << endl; }
+  A() :
+    value(0) {
+  }
+  A(const int val) :
+    value(val) {
+  }
+  int value;
+  void evaluate() {
+    cout << "Hello from A with value = " << value << endl;
+  }
 };
 
 struct B {
-	static void evaluate() { cout << "Hello from B" << endl; }
+  B() :
+    value(0) {
+  }
+  B(const int val) :
+    value(val) {
+  }
+  int value;
+  void evaluate() {
+    cout << "Hello from B with value = " << value << endl;
+  }
 };
 
 struct C {
-	static void evaluate() { cout << "Hello from C" << endl; }
+  C() :
+    value(0) {
+  }
+  C(const int val) :
+    value(val) {
+  }
+  int value;
+  void evaluate() {
+    cout << "Hello from C with value = " << value << endl;
+  }
 };
 
-template <class T>
+template<class T>
 struct active_trait {
-	static const bool value = false;
+  static const bool value = false;
 };
 
-template <>
+template<>
 struct active_trait<A> {
-	static const bool value = true;
-}
+  static const bool value = true;
+};
 
-template <>
+template<>
 struct active_trait<C> {
-	static const bool value = true;
-}
+  static const bool value = true;
+};
 
 struct evaluator {
-	template <class T>
-	void operator()(T) const {
-		T::evaluate();
-	}
+  template<class T>
+  void operator()(T & t) const {
+    t.evaluate();
+  }
 };
 
-int main( int argc, char * argv[] )
-{
-	typedef mpl::vector<A, B, C> all_items;
-	typedef mpl::transform<all_items, active_traits> items;
-	mpl::for_each<items>(evaluator());
-
+int main(int argc, char * argv[]) {
+  typedef fusion::list<A, B, C> Seq;
+  Seq seq;
+  fusion::at_c<0>(seq) = A(9);
+  fusion::at_c<1>(seq) = B(2);
+  fusion::at_c<2>(seq) = C(7);
+  fusion::for_each(seq, evaluator());
 }
