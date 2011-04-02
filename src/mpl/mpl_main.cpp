@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 #include <boost/fusion/algorithm.hpp>
 #include <boost/fusion/container.hpp>
 #include <boost/fusion/sequence.hpp>
@@ -6,71 +7,61 @@
 using namespace std;
 using namespace boost;
 
-struct A {
-  A() :
-    value(0) {
-  }
-  A(const int val) :
-    value(val) {
+struct Base {
+  Base(const int value_arg, const string name_arg) :
+    value(value_arg), name(name_arg) {
   }
   int value;
+  string name;
   void evaluate() {
-    cout << "Hello from A with value = " << value << endl;
-  }
-  template <class S> void setup(S & s) {
-    cout << "setup A" << endl;
+    cout << "Hello from " << name << " with value = " << value << endl;
   }
 };
 
-struct B {
-  B() :
-    value(0), a(0) {
+struct A : public Base{
+  A() : Base(0, "A") {}
+  A(const int val) : Base(val, "A") {}
+  template <class S>
+  void setup(S & s) {
+    cout << "setup " << name << endl;
   }
-  B(const int val) :
-    value(val), a(0) {
-  }
-  int value;
-  int a;
-  void evaluate() {
-    cout << "Hello from B with value = " << value*a << endl;
-  }
-  template <class S> void setup(S & s) {
-    a = (*fusion::find<A>(s)).value;
+};
+
+struct B : public Base {
+  B() : Base(0, "B"), b(0) {}
+  B(const int val) : Base(val, "B"), b(val) {}
+  int b;
+  template <class S>
+  void setup(S & s) {
+    int a = (*fusion::find<A>(s)).value;
+    value = a * b;
     cout << "setup B, a = " << a << endl;
   }
 };
 
-struct C {
-  C() :
-    value(0) {
-  }
-  C(const int val) :
-    value(val) {
-  }
-  int value;
-  void evaluate() {
-    cout << "Hello from C with value = " << value << endl;
-  }
-  template <class S> void setup(S & s) {
-    cout << "setup C" << endl;
+struct C : public Base {
+  C() : Base(0,"C") {}
+  C(const int val) : Base(val, "C") {}
+  template <class S>
+  void setup(S & s) {
+    cout << "setup " << name << endl;
   }
 };
 
-struct D {
-  D() :
-    value(0) {
-  }
-  D(const int val) :
-    value(val) {
-  }
-  int value;
-  void evaluate() {
-    cout << "Hello from D with value = " << value << endl;
-  }
-  template <class S> void setup(S & s) {
-    cout << "setup D" << endl;
+struct D : public Base {
+  D() : Base(0,"D") {}
+  D(const int val) : Base(val, "D") {}
+  template <class S>
+  void setup(S & s) {
+    cout << "setup " << name << endl;
   }
 };
+
+struct X;
+struct Y;
+typedef fusion::map<
+    fusion::pair<X, fusion::list<C> >,
+    fusion::pair<Y, fusion::list<D> > > opt;
 
 template <class S>
 struct DoSetup {
@@ -104,7 +95,6 @@ struct manager {
   T & get() {
     return *fusion::find<T>(seq);
   }
-
   S seq;
   DoSetup<S> do_setup;
   DoEvaluate do_evaluate;
@@ -118,11 +108,14 @@ int main(int argc, char * argv[]) {
   m.set(C(7));
   m.run();
 
-  typedef fusion::cons<D, Seq> Seq2;
+  typedef fusion::result_of::value_at_key<opt,Y>::type ys;
+  typedef fusion::result_of::begin<ys>::type yi;
+  typedef fusion::result_of::value_of<yi>::type X_type;
+  typedef fusion::cons<X_type, Seq> Seq2;
   manager<Seq2> m2;
   m2.set( m.get<A>() );
   m2.set( m.get<B>() );
   m2.set( m.get<C>() );
-  m2.set( D(1) );
+  m2.set( X_type(1) );
   m2.run();
 }
