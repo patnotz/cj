@@ -18,11 +18,12 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 # Now build executables from this library, tailored main()s, and Trilinos
 
-add_library(mplLib ${SOURCES} ${HEADERS})
+#add_library(mplLib ${SOURCES} ${HEADERS})
 add_executable(mpl mpl_main.cpp)
 
-SET(mpl_LIBRARIES
-    mplLib
-)
+#SET(mpl_LIBRARIES
+#    mplLib
+#)
 
-target_link_libraries(mpl ${mpl_LIBRARIES} ${Boost_LIBRARIES}) 
+#target_link_libraries(mpl ${mpl_LIBRARIES} ${Boost_LIBRARIES}) 
+target_link_libraries(mpl ${Boost_LIBRARIES}) 
