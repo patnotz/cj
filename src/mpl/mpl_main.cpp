@@ -73,39 +73,56 @@ struct D {
 };
 
 template <class S>
-struct manager {
-  template <class F>
-  void apply(F & f) {
-    fusion::for_each(seq,f);
-  }
-  S seq;
-};
-
-template <class S>
-struct evaluator {
-  evaluator(S & s) : seq(s) {}
+struct DoSetup {
+  DoSetup(S & s) : seq(s) {}
   template<class T>
   void operator()(T & t) const {
     t.setup(seq);
-    t.evaluate();
   }
   S & seq;
 };
 
-int main(int argc, char * argv[]) {
-  typedef fusion::list<A, B, C> Seq;
-  manager<Seq> m;
-  if(fusion::has_key<A>(m.seq))
-    *fusion::find<A>(m.seq) = A(9);
-  if(fusion::has_key<B>(m.seq))
-    *fusion::find<B>(m.seq) = B(2);
-  if(fusion::has_key<C>(m.seq))
-    *fusion::find<C>(m.seq) = C(7);
-  evaluator<Seq> e(m.seq);
-  m.apply(e);
+struct DoEvaluate {
+  template <class T>
+  void operator()(T & t) const {
+    t.evaluate();
+  }
+};
 
-  //typedef typename fusion::result_of::find<Seq, B>::type Pos;
-  //typedef typename fusion::result_of::insert<Seq,Pos,D>::type Seq2;
-  //Seq2 s2;
-  //manager<Seq2> m2;
+template <class S>
+struct manager {
+  manager() : seq(S()), do_setup(seq) {}
+  void run() {
+    fusion::for_each(seq,do_setup);
+    fusion::for_each(seq,do_evaluate);
+  }
+  template <class T>
+  void set(T t) {
+    *fusion::find<T>(seq) = t;
+  }
+  template <class T>
+  T & get() {
+    return *fusion::find<T>(seq);
+  }
+
+  S seq;
+  DoSetup<S> do_setup;
+  DoEvaluate do_evaluate;
+};
+
+int main(int argc, char * argv[]) {
+  typedef fusion::cons<A, fusion::cons<B, fusion::cons<C> > > Seq;
+  manager<Seq> m;
+  m.set(A(9));
+  m.set(B(2));
+  m.set(C(7));
+  m.run();
+
+  typedef fusion::cons<D, Seq> Seq2;
+  manager<Seq2> m2;
+  m2.set( m.get<A>() );
+  m2.set( m.get<B>() );
+  m2.set( m.get<C>() );
+  m2.set( D(1) );
+  m2.run();
 }
