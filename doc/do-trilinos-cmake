@@ -60,7 +60,6 @@ cmake \
       -D Stratimikos_ENABLE_TEUCHOS_TIME_MONITOR:BOOL=ON \
 \
       -D CMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-      -D Trilinos_ENABLE_Export_Makefiles:BOOL=ON \
 \
       -D Trilinos_ENABLE_Trios:BOOL=ON \
       -D Trilinos_ENABLE_Pamgen:BOOL=ON \
@@ -88,4 +87,5 @@ cmake \
 #        -D TPL_ENABLE_Netcdf:BOOL=ON \
 #        -D TPL_Netcdf_INCLUDE_DIRS:PATH=/home/agsalin/install/netcdf-4.0.1/include \
 #        -D Netcdf_LIBRARY_DIRS:PATH=/home/agsalin/install/netcdf-4.0.1/lib \
+#      -D Trilinos_ENABLE_Export_Makefiles:BOOL=ON \
 
