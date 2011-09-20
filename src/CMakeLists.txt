@@ -45,7 +45,7 @@ add_executable(Cj cj_main.cpp)
 
 SET(Cj_LIBRARIES
     cjLib
-    stk_io
+#    stk_io
     stk_mesh_base
     stk_mesh_fem
     stk_util_diag

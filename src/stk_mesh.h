@@ -9,8 +9,11 @@
 #include <stk_mesh/base/BulkData.hpp>
 #include <stk_mesh/base/Field.hpp>
 #include <stk_mesh/fem/CoordinateSystems.hpp>
-#include <stk_mesh/fem/DefaultFEM.hpp>
-#include <stk_mesh/fem/TopologyHelpers.hpp>
+
+#include <Shards_BasicTopologies.hpp>
+#include <stk_mesh/base/Entity.hpp>
+#include <stk_mesh/base/FieldData.hpp>
+#include <stk_mesh/fem/FEMMetaData.hpp>
 
 enum { field_data_chunk_size = 10 };
 
@@ -27,13 +30,15 @@ public:
 
   STK_Mesh( stk::ParallelMachine comm, const int & spatial_dim);
 
-  const int                      my_spatial_dimension;
-  MetaData                       my_metaData;
-  BulkData                       my_bulkData;
-  DefaultFEM                     my_fem;
-  PartVector                     my_parts;
-  const EntityRank               my_elem_rank;
-  VectorFieldType &              my_coordinates_field;
+  const int my_spatial_dimension;
+  fem::FEMMetaData my_fem_metaData;
+  BulkData my_bulkData;
+  PartVector my_parts;
+  const EntityRank my_elem_rank;
+  const EntityRank my_node_rank;
+
+  VectorFieldType & my_coordinates_field;
+
 };
 
 } //namespace mesh

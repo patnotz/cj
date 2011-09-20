@@ -11,7 +11,7 @@ public:
 	Mesh_Manager(const char * input_file_name, const char * output_file_name);
 	~Mesh_Manager();
 
-	void print_field_info(stk::mesh::STK_Mesh * const stk_mesh);
+	void print_field_info(stk::mesh::STK_Mesh * const mesh);
 
 	void populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,stk::mesh::ScalarFieldType & field, const stk::mesh::EntityRank & rank);
 	void populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,stk::mesh::VectorFieldType & field, const stk::mesh::EntityRank & rank);

@@ -1,0 +1,23 @@
+These are all the steps I had to take to get the code up and running on a new machine.  There may be more or less involved in this depending on what has already been installed on the machine in question.
+
+1. Install git on your local machine
+2. Follow the instructions on github to add your public rsa key and be able to pull
+3. Set up git with you user name and email etc
+4. clone the repo: git clone git@github/com/danturner/cj.git
+5. clone Trilinos: git clone software.sandia.gov:/space/git/Trilinos
+6. download and install netcdf
+7. install hdf5 with macports
+8. build netcdf with 
+     ./configure --prefix=/home/ed/local --disable-netcdf-4
+     make check install
+   (folder permissions for tons of folders need to be updated to install)
+9. Set the CJ_TRILINOS_DIR variable export CJ_TRILINOS_DIR="<>" in the do-trilinos-build script
+10. copy the trilinos do-trininos-build file from the doc folder to SOME_BUILD_DIR
+11. install mpicc in usr/local/bin (download mpich and install)
+12. Install the latest version of xcode
+13. install boost by following the directions on their website, (run ./bootstrap.sh and then ./b2)
+14. configure trilinos with ccmake $TRINILOS_HOME (set this variable first)
+15. Build trilinos with make and make install
+16. You may need to get the SEACAS tools installed to run the regression tests
+17. When installing SEACAS make sure that you set the group in the site.def file to a valid group
+18. I've had a lot of trouble with installing SEACAS and most of it seems to be related to not having hdf5 or exodus installed in the right place (/usr/local/bin). Usually I can search for the file and put in the in right folder
