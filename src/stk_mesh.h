@@ -15,20 +15,23 @@
 #include <stk_mesh/base/FieldData.hpp>
 #include <stk_mesh/fem/FEMMetaData.hpp>
 
-enum { field_data_chunk_size = 10 };
+enum
+{
+  field_data_chunk_size = 10
+};
 
 namespace stk {
 namespace mesh {
 
-typedef stk::mesh::Field<double,stk::mesh::Cartesian> VectorFieldType ;
-typedef stk::mesh::Field<double>                      ScalarFieldType ;
+typedef stk::mesh::Field<double, stk::mesh::Cartesian> VectorFieldType;
+typedef stk::mesh::Field<double> ScalarFieldType;
 
 class STK_Mesh
 {
 public:
   ~STK_Mesh();
 
-  STK_Mesh( stk::ParallelMachine comm, const int & spatial_dim);
+  STK_Mesh(stk::ParallelMachine comm, const int & spatial_dim);
 
   const int my_spatial_dimension;
   fem::FEMMetaData my_fem_metaData;
@@ -43,6 +46,5 @@ public:
 
 } //namespace mesh
 } //namespace stk
-
 
 #endif /* STK_MESH_H_ */

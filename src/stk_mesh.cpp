@@ -13,7 +13,8 @@ STK_Mesh::STK_Mesh(stk::ParallelMachine comm, const int & spatial_dim) :
 {
   // Put the coordinates and temperature field on all nodes
   Part & universal = my_fem_metaData.universal_part();
-  put_field(my_coordinates_field, my_node_rank, universal, my_spatial_dimension);
+  put_field(my_coordinates_field, my_node_rank, universal,
+    my_spatial_dimension);
   // commit will be called by the mesh_manager when it has populated the parts
 }
 

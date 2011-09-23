@@ -4,6 +4,6 @@
 #include <json/json.h>
 #include <log.h>
 
-int drive_simulation(Json::Value & config, int argc, char * argv[] );
+int drive_simulation(Json::Value & config, int argc, char * argv[]);
 
 #endif /* DRIVE_SIMULATION_H_ */

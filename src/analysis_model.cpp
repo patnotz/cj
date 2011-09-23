@@ -5,7 +5,7 @@
 #include <sstream>
 #include <time.h>
 
-#include <mesh_manager.h>
+#include <analysis_model.h>
 #include <messages.h>
 #include <log.h>
 #include <stk_mesh/base/MetaData.hpp>
@@ -24,25 +24,34 @@
 #include <netcdf.h>
 
 using namespace std;
-//using stk::mesh::contain;
 
-Mesh_Manager::Mesh_Manager(const char * input_file_name,
+Analysis_Model_Factory::Analysis_Model_Factory(){}
+
+Teuchos::RCP<Analysis_Model> Analysis_Model_Factory::create(const char * input_file_name, const char * output_file_name)
+{
+  using Teuchos::rcp;
+
+  // Create new Peridigm object
+  return rcp(new Analysis_Model(input_file_name, output_file_name));
+}
+
+Analysis_Model::Analysis_Model(const char * input_file_name,
   const char * output_file_name) :
     my_input_file_name(input_file_name), my_output_file_name(output_file_name), my_input_initialized(
       false), my_output_initialized(false)
 {
 }
 
-Mesh_Manager::~Mesh_Manager()
+Analysis_Model::~Analysis_Model()
 {
 }
 
-void Mesh_Manager::initialize_mesh_parts_and_commit(
+void Analysis_Model::initialize_mesh_parts_and_commit(
   stk::mesh::STK_Mesh * const mesh)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::initialize_mesh_parts()";
+  string method_name = "Analysis_Model::initialize_mesh_parts()";
   oss << "Initializing mesh parts";
   progress_message(&oss, method_name);
 #endif
@@ -69,7 +78,7 @@ void Mesh_Manager::initialize_mesh_parts_and_commit(
     mesh->my_parts.push_back(part_ptr);
   }
 #ifdef DEBUG_OUTPUT
-  for(int i = 0; i < my_num_elem_blk; ++i)
+  for (int i = 0; i < my_num_elem_blk; ++i)
   {
     oss << mesh->my_parts[i]->name();
     sub_sub_progress_message(&oss);
@@ -82,7 +91,7 @@ void Mesh_Manager::initialize_mesh_parts_and_commit(
 #endif
 }
 
-std::vector<std::string> Mesh_Manager::get_field_names(
+std::vector<std::string> Analysis_Model::get_field_names(
   stk::mesh::STK_Mesh * const mesh, stk::mesh::EntityRank entity_rank,
   unsigned field_rank)
 {
@@ -116,7 +125,7 @@ std::vector<std::string> Mesh_Manager::get_field_names(
   return nodal_vars_vec;
 }
 
-void Mesh_Manager::print_field_info(stk::mesh::STK_Mesh * const mesh)
+void Analysis_Model::print_field_info(stk::mesh::STK_Mesh * const mesh)
 {
   log() << "  =============== REGISTERED NODAL SCALAR FIELDS ==============="
       << endl;
@@ -157,7 +166,7 @@ void Mesh_Manager::print_field_info(stk::mesh::STK_Mesh * const mesh)
       << endl;
 }
 
-int Mesh_Manager::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,
+int Analysis_Model::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,
   const std::string & name, const std::string & component)
 {
   string comp = "";
@@ -195,7 +204,7 @@ int Mesh_Manager::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,
   return -1;
 }
 
-int Mesh_Manager::get_element_variable_index(stk::mesh::STK_Mesh * const mesh,
+int Analysis_Model::get_element_variable_index(stk::mesh::STK_Mesh * const mesh,
   const std::string & name, const std::string & component)
 {
   string comp = "";
@@ -233,11 +242,11 @@ int Mesh_Manager::get_element_variable_index(stk::mesh::STK_Mesh * const mesh,
   return -1;
 }
 
-void Mesh_Manager::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
+void Analysis_Model::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::populate_mesh_elements()";
+  string method_name = "Analysis_Model::populate_mesh_elements()";
   oss << "Populating mesh elements";
   progress_message(&oss, method_name);
 #endif
@@ -258,35 +267,36 @@ void Mesh_Manager::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
 #ifdef DEBUG_OUTPUT
       oss << "ExodusII: ";
       int base = 0;
-      if(elem_type == "QUAD4")
+      if (elem_type == "QUAD4")
       {
-        base = ( ele ) * 4;
+        base = (ele) * 4;
       }
-      else if(elem_type == "HEX8")
+      else if (elem_type == "HEX8")
       {
-        base = ( ele ) * 8;
+        base = (ele) * 8;
       }
       else if (elem_type == "TETRA4" || elem_type == "TETRA")
       {
-        base = ( ele ) * 4;
+        base = (ele) * 4;
       }
       else if (elem_type == "TRI3")
       {
-        base = ( ele ) * 3;
+        base = (ele) * 3;
       }
-      for(int node = 0; node< my_num_nodes_per_elem[block]; ++node)
+      for (int node = 0; node < my_num_nodes_per_elem[block]; ++node)
       {
         oss << connectivity[base + node] << ",";
       }
       oss << " -> STK mesh: ";
-      for(int node = 0; node< my_num_nodes_per_elem[block]; ++node)
+      for (int node = 0; node < my_num_nodes_per_elem[block]; ++node)
       {
         oss << node_ids[node] << ",";
       }
       sub_sub_progress_message(&oss);
 #endif
 #ifdef DEBUG_OUTPUT
-      oss << "Adding element id: " << elem_id << " in block " << mesh->my_parts[block]->name();
+      oss << "Adding element id: " << elem_id << " in block "
+          << mesh->my_parts[block]->name();
       sub_sub_progress_message(&oss);
 #endif
       stk::mesh::fem::declare_element(mesh->my_bulkData, *mesh->my_parts[block],
@@ -301,12 +311,12 @@ void Mesh_Manager::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
   mesh->my_bulkData.modification_end();
 }
 
-void Mesh_Manager::populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,
+void Analysis_Model::populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,
   stk::mesh::VectorFieldType & field, const stk::mesh::EntityRank & rank)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::populate_bogus_vector_field()";
+  string method_name = "Analysis_Model::populate_bogus_vector_field()";
   oss << "Populating bogus vector field " << field.name();
   progress_message(&oss, method_name);
 #endif
@@ -332,12 +342,12 @@ void Mesh_Manager::populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,
   }
 }
 
-void Mesh_Manager::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,
+void Analysis_Model::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,
   stk::mesh::ScalarFieldType & field, const stk::mesh::EntityRank & rank)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::populate_bogus_scalar_field()";
+  string method_name = "Analysis_Model::populate_bogus_scalar_field()";
   oss << "Populating bogus scalar field " << field.name();
   progress_message(&oss, method_name);
 #endif
@@ -354,19 +364,18 @@ void Mesh_Manager::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,
     for (int i = 0; i < num_items_in_bucket; ++i)
     {
       const unsigned item_id = bucket[i].identifier();
-      if (rank == mesh->my_elem_rank) field_array(i) =
-          item_id * 1150.6;
+      if (rank == mesh->my_elem_rank) field_array(i) = item_id * 1150.6;
       else
         field_array(i) = item_id * 4.6890;
     }
   }
 }
 
-void Mesh_Manager::populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh)
+void Analysis_Model::populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::populate_mesh_coorindates()";
+  string method_name = "Analysis_Model::populate_mesh_coorindates()";
   oss << "Populating STK mesh";
   progress_message(&oss, method_name);
 #endif
@@ -402,13 +411,14 @@ void Mesh_Manager::populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh)
   if (my_num_dim > 2) delete my_z;
 }
 
-void Mesh_Manager::map_node_coordinates(stk::mesh::EntityId node_id,
+void Analysis_Model::map_node_coordinates(stk::mesh::EntityId node_id,
   double coord[])
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::map_node_coordinates()";
-  oss << "Adding the coordinates field for node " << node_id << " to STK mesh field my_coordinates";
+  string method_name = "Analysis_Model::map_node_coordinates()";
+  oss << "Adding the coordinates field for node " << node_id
+      << " to STK mesh field my_coordinates";
   progress_message(&oss, method_name);
 #endif
   if (node_id < 1 || node_id > my_num_nodes)
@@ -425,14 +435,15 @@ void Mesh_Manager::map_node_coordinates(stk::mesh::EntityId node_id,
   if (my_num_dim > 2) coord[2] = my_z[index];
 }
 
-void Mesh_Manager::map_node_ids(const int block, const int ele,
+void Analysis_Model::map_node_ids(const int block, const int ele,
   stk::mesh::EntityId node_ids[], const string & elem_type,
   const int * connectivity)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::map_node_ids()";
-  oss << "Converting the ExodusII connectivity for element " << ele << " of block " << block << " to STK mesh. Element type is " << elem_type;
+  string method_name = "Analysis_Model::map_node_ids()";
+  oss << "Converting the ExodusII connectivity for element " << ele
+      << " of block " << block << " to STK mesh. Element type is " << elem_type;
   progress_message(&oss, method_name);
 #endif
   if (ele < 0 || ele >= my_num_elem_in_block[block])
@@ -479,6 +490,12 @@ void Mesh_Manager::map_node_ids(const int block, const int ele,
     node_ids[1] = connectivity[base + 1];
     node_ids[2] = connectivity[base + 2];
   }
+  else if (elem_type == "SPHERE")
+  {
+    // For a sphere mesh or particle mesh the connectivity is just one node (itself)
+    const unsigned base = (ele);
+    node_ids[0] = connectivity[base + 0];
+  }
   else
   {
     oss << "map_node_ids() does not recognize element type: " << elem_type;
@@ -488,7 +505,7 @@ void Mesh_Manager::map_node_ids(const int block, const int ele,
 }
 
 stk::mesh::Part * const
-Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh,
+Analysis_Model::part_pointer(stk::mesh::STK_Mesh * const mesh,
   const string & elem_type, const string & name)
 {
   stringstream oss;
@@ -496,22 +513,34 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh,
 
   if (elem_type == "QUAD4")
   {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part < shards::Quadrilateral<4> > (mesh->my_fem_metaData, name);
+    stk::mesh::Part & part = stk::mesh::fem::declare_part<
+        shards::Quadrilateral<4> >(mesh->my_fem_metaData, name);
     part_ptr = &part;
   }
   else if (elem_type == "HEX8")
   {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part < shards::Hexahedron<8> > (mesh->my_fem_metaData, name);
+    stk::mesh::Part & part =
+        stk::mesh::fem::declare_part<shards::Hexahedron<8> >(
+          mesh->my_fem_metaData, name);
     part_ptr = &part;
   }
   else if (elem_type == "TETRA4" || elem_type == "TETRA")
   {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part < shards::Tetrahedron<4> > (mesh->my_fem_metaData, name);
+    stk::mesh::Part & part =
+        stk::mesh::fem::declare_part<shards::Tetrahedron<4> >(
+          mesh->my_fem_metaData, name);
     part_ptr = &part;
   }
   else if (elem_type == "TRI3")
   {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part < shards::Triangle<3> > (mesh->my_fem_metaData, name);
+    stk::mesh::Part & part = stk::mesh::fem::declare_part<shards::Triangle<3> >(
+      mesh->my_fem_metaData, name);
+    part_ptr = &part;
+  }
+  else if (elem_type == "SPHERE")
+  {
+    stk::mesh::Part & part = stk::mesh::fem::declare_part<shards::Particle>(
+      mesh->my_fem_metaData, name);
     part_ptr = &part;
   }
   else
@@ -523,7 +552,7 @@ Mesh_Manager::part_pointer(stk::mesh::STK_Mesh * const mesh,
   return part_ptr;
 }
 
-void Mesh_Manager::read_mesh()
+void Analysis_Model::read_mesh()
 {
   stringstream oss;
   int error;
@@ -553,9 +582,9 @@ void Mesh_Manager::read_mesh()
   my_input_initialized = true;
 }
 
-void Mesh_Manager::initialize_read()
+void Analysis_Model::initialize_read()
 {
-  string method_name = "Mesh_Manager::initialize_read()";
+  string method_name = "Analysis_Model::initialize_read()";
   int error;
   stringstream oss;
 
@@ -595,7 +624,7 @@ error  = ex_get_init(my_input_exoid, title, &my_num_dim, &my_num_nodes, &my_num_
       << endl;
 }
 
-void Mesh_Manager::import_nodes()
+void Analysis_Model::import_nodes()
 {
   int error;
   /* read nodal coordinates values and names from database */
@@ -607,13 +636,13 @@ void Mesh_Manager::import_nodes()
   error = ex_get_coord(my_input_exoid, my_x, my_y, my_z);
 }
 
-void Mesh_Manager::import_elem_map()
+void Analysis_Model::import_elem_map()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::import_elem_map()";
+  string method_name = "Analysis_Model::import_elem_map()";
   stringstream oss;
   oss << "Reading element map";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
 
   int error;
@@ -622,30 +651,31 @@ void Mesh_Manager::import_elem_map()
   error = ex_get_map(my_input_exoid, my_elem_map);
 }
 
-void Mesh_Manager::import_blocks()
+void Analysis_Model::import_blocks()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::import_blocks()";
+  string method_name = "Analysis_Model::import_blocks()";
   stringstream oss;
   oss << "Reading blocks";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
 
-  char elem_type[MAX_STR_LENGTH + 1];int error;
+  char elem_type[MAX_STR_LENGTH + 1];int
+  error;
 
   /* read element block parameters */
   my_block_ids = new int[my_num_elem_blk]; // FIXME: free me later
-  my_num_elem_in_block = new int[my_num_elem_blk];// FIXME: free me later
-  my_num_nodes_per_elem = new int[my_num_elem_blk];// FIXME: free me later
-  my_num_attr = new int[my_num_elem_blk];// FIXME: free me later
-  error = ex_get_elem_blk_ids (my_input_exoid, my_block_ids);
-  for (int i=0; i<my_num_elem_blk; i++)
+  my_num_elem_in_block = new int[my_num_elem_blk]; // FIXME: free me later
+  my_num_nodes_per_elem = new int[my_num_elem_blk]; // FIXME: free me later
+  my_num_attr = new int[my_num_elem_blk]; // FIXME: free me later
+  error = ex_get_elem_blk_ids(my_input_exoid, my_block_ids);
+  for (int i = 0; i < my_num_elem_blk; i++)
   {
-    error = ex_get_elem_block (my_input_exoid, my_block_ids[i], elem_type,
-        &(my_num_elem_in_block[i]),
-        &(my_num_nodes_per_elem[i]), &(my_num_attr[i]));
+    error = ex_get_elem_block(my_input_exoid, my_block_ids[i], elem_type,
+      &(my_num_elem_in_block[i]), &(my_num_nodes_per_elem[i]),
+      &(my_num_attr[i]));
 
-    my_elem_types.insert(pair<int,string>(my_block_ids[i],elem_type));
+    my_elem_types.insert(pair<int, string>(my_block_ids[i], elem_type));
 
 #ifdef DEBUG_OUTPUT
     oss << "Element block: " << my_block_ids[i];
@@ -662,10 +692,10 @@ void Mesh_Manager::import_blocks()
   };
 }
 
-void Mesh_Manager::import_connectivities()
+void Analysis_Model::import_connectivities()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::import_connectivity()";
+  string method_name = "Analysis_Model::import_connectivity()";
   stringstream oss;
 #endif
 
@@ -680,18 +710,18 @@ void Mesh_Manager::import_connectivities()
     progress_message(&oss, method_name);
 #endif
     connectivity = new int[my_num_nodes_per_elem[i] * my_num_elem_in_block[i]]; // FIXME: free me later
-error    = ex_get_elem_conn (my_input_exoid, my_block_ids[i], connectivity);
-    my_connectivities.insert(pair<int,int*>(my_block_ids[i],connectivity));
+error    = ex_get_elem_conn(my_input_exoid, my_block_ids[i], connectivity);
+    my_connectivities.insert(pair<int, int*>(my_block_ids[i], connectivity));
   }
 }
 
-void Mesh_Manager::print_connectivity(const int & block_id)
+void Analysis_Model::print_connectivity(const int & block_id)
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::print_connectivity()";
+  string method_name = "Analysis_Model::print_connectivity()";
   stringstream oss;
   oss << "Block ID: " << block_id;
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   if (my_connectivities.find(block_id) == my_connectivities.end()) return;
 
@@ -711,13 +741,13 @@ void Mesh_Manager::print_connectivity(const int & block_id)
   }
 }
 
-void Mesh_Manager::import_node_sets()
+void Analysis_Model::import_node_sets()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::import_node_sets()";
+  string method_name = "Analysis_Model::import_node_sets()";
   stringstream oss;
   oss << "Reading node sets";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   int * node_list;
@@ -736,7 +766,8 @@ void Mesh_Manager::import_node_sets()
     sub_progress_message(&oss);
     oss << "Number of nodes in set: " << my_num_nodes_in_node_set[i];
     sub_sub_progress_message(&oss);
-    oss << "Number of distribution factors in set: " << my_num_df_in_node_set[i];
+    oss << "Number of distribution factors in set: "
+        << my_num_df_in_node_set[i];
     sub_sub_progress_message(&oss);
 #endif
     node_list = new int[my_num_nodes_in_node_set[i]]; // FIXME: free me later
@@ -754,13 +785,13 @@ void Mesh_Manager::import_node_sets()
   }
 }
 
-void Mesh_Manager::import_side_sets()
+void Analysis_Model::import_side_sets()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::import_side_sets()";
+  string method_name = "Analysis_Model::import_side_sets()";
   stringstream oss;
   oss << "Reading side sets";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   int * elem_list;
@@ -812,14 +843,14 @@ dist_fact    = new float[my_num_df_in_side_set[i]]; // FIXME: free me later
   }
 }
 
-void Mesh_Manager::initialize_output(const char * title,
+void Analysis_Model::initialize_output(const char * title,
   stk::mesh::STK_Mesh & mesh)
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_output()";
+  string method_name = "Analysis_Model::write_output()";
   stringstream oss;
   oss << "Writing output file: " << my_output_file_name;
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
 
   int error;
@@ -859,14 +890,14 @@ void Mesh_Manager::initialize_output(const char * title,
   my_output_initialized = true;
 }
 
-void Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
+void Analysis_Model::write_coordinates(const stk::mesh::STK_Mesh & mesh)
 {
   stringstream oss;
 
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_coordinates()";
+  string method_name = "Analysis_Model::write_coordinates()";
   oss << "Writing coordinates";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -908,15 +939,15 @@ void Mesh_Manager::write_coordinates(const stk::mesh::STK_Mesh & mesh)
   error = ex_put_coord_names(my_output_exoid, coord_names);
 }
 
-void Mesh_Manager::write_nodal_scalar(const int & time_step,
+void Analysis_Model::write_nodal_scalar(const int & time_step,
   const float & time_value, stk::mesh::STK_Mesh & mesh,
   const stk::mesh::ScalarFieldType & field)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_nodal_scalar()";
+  string method_name = "Analysis_Model::write_nodal_scalar()";
   oss << "Writing nodal scalar: " << field.name();
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   float values[my_num_nodes];
@@ -942,15 +973,15 @@ void Mesh_Manager::write_nodal_scalar(const int & time_step,
   write_nodal_variable_to_output(time_step, time_value, values, var_index);
 }
 
-void Mesh_Manager::write_nodal_vector(const int & time_step,
+void Analysis_Model::write_nodal_vector(const int & time_step,
   const float & time_value, stk::mesh::STK_Mesh & mesh,
   const stk::mesh::VectorFieldType & field)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_nodal_vector()";
+  string method_name = "Analysis_Model::write_nodal_vector()";
   oss << "Writing nodal vector: " << field.name();
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   float values[my_num_nodes];
@@ -997,15 +1028,15 @@ bool bucket_blocks_contain_block_named(const stk::mesh::Bucket & bucket,
   return false;
 }
 
-void Mesh_Manager::write_element_scalar(const int & time_step,
+void Analysis_Model::write_element_scalar(const int & time_step,
   const float & time_value, stk::mesh::STK_Mesh & mesh,
   const stk::mesh::ScalarFieldType & field)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_element_scalar()";
+  string method_name = "Analysis_Model::write_element_scalar()";
   oss << "Writing element scalar: " << field.name();
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1048,15 +1079,15 @@ void Mesh_Manager::write_element_scalar(const int & time_step,
   }
 }
 
-void Mesh_Manager::write_element_vector(const int & time_step,
+void Analysis_Model::write_element_vector(const int & time_step,
   const float & time_value, stk::mesh::STK_Mesh & mesh,
   const stk::mesh::VectorFieldType & field)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_element_vector()";
+  string method_name = "Analysis_Model::write_element_vector()";
   oss << "Writing element vector: " << field.name();
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1106,25 +1137,25 @@ void Mesh_Manager::write_element_vector(const int & time_step,
   }
 }
 
-void Mesh_Manager::write_elem_map()
+void Analysis_Model::write_elem_map()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_elem_map()";
+  string method_name = "Analysis_Model::write_elem_map()";
   stringstream oss;
   oss << "Writing element map";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   error = ex_put_map(my_output_exoid, my_elem_map);
 }
 
-void Mesh_Manager::write_elem_blocks(const stk::mesh::STK_Mesh & mesh)
+void Analysis_Model::write_elem_blocks(const stk::mesh::STK_Mesh & mesh)
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_elem_blocks()";
+  string method_name = "Analysis_Model::write_elem_blocks()";
   stringstream oss;
   oss << "Writing element blocks";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1143,13 +1174,13 @@ void Mesh_Manager::write_elem_blocks(const stk::mesh::STK_Mesh & mesh)
   }
 }
 
-void Mesh_Manager::write_elem_connectivities()
+void Analysis_Model::write_elem_connectivities()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_elem_connectivity()";
+  string method_name = "Analysis_Model::write_elem_connectivity()";
   stringstream oss;
   oss << "Writing element connectivity";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   int * connect;
@@ -1161,13 +1192,13 @@ void Mesh_Manager::write_elem_connectivities()
   }
 }
 
-void Mesh_Manager::write_node_sets()
+void Analysis_Model::write_node_sets()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_node_sets()";
+  string method_name = "Analysis_Model::write_node_sets()";
   stringstream oss;
   oss << "Writing node sets";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
 
   int error;
@@ -1185,13 +1216,13 @@ void Mesh_Manager::write_node_sets()
   }
 }
 
-void Mesh_Manager::write_side_sets()
+void Analysis_Model::write_side_sets()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_side_sets()";
+  string method_name = "Analysis_Model::write_side_sets()";
   stringstream oss;
   oss << "Writing side sets";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   for (int i = 0; i < my_num_side_sets; ++i)
@@ -1207,13 +1238,13 @@ void Mesh_Manager::write_side_sets()
   }
 }
 
-void Mesh_Manager::write_qa_records()
+void Analysis_Model::write_qa_records()
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_qa_records()";
+  string method_name = "Analysis_Model::write_qa_records()";
   oss << "Writing Q & A records";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   char *qa_record[1][4];
@@ -1244,13 +1275,13 @@ void Mesh_Manager::write_qa_records()
   error = ex_put_qa(my_output_exoid, num_qa_rec, qa_record);
 }
 
-void Mesh_Manager::write_variable_names(stk::mesh::STK_Mesh * const mesh)
+void Analysis_Model::write_variable_names(stk::mesh::STK_Mesh * const mesh)
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_variable_names()";
+  string method_name = "Analysis_Model::write_variable_names()";
   stringstream oss;
   oss << "Writing variable names";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   // NODAL fields
@@ -1321,14 +1352,14 @@ void Mesh_Manager::write_variable_names(stk::mesh::STK_Mesh * const mesh)
     ele_var_names);
 }
 
-void Mesh_Manager::write_time_step_info(const int & time_step_num,
+void Analysis_Model::write_time_step_info(const int & time_step_num,
   const float & time_value)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_time_step_info()";
+  string method_name = "Analysis_Model::write_time_step_info()";
   oss << "Writing time step info to output";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1342,27 +1373,27 @@ void Mesh_Manager::write_time_step_info(const int & time_step_num,
   error = ex_put_time(my_output_exoid, time_step_num, &time_value);
 }
 
-void Mesh_Manager::update_output()
+void Analysis_Model::update_output()
 {
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::update_output()";
+  string method_name = "Analysis_Model::update_output()";
   stringstream oss;
   oss << "Updating output";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   /* update the data file; this should be done at the end of every time step * to ensure that no data is lost if the analysis dies */
   error = ex_update(my_output_exoid);
 }
 
-void Mesh_Manager::write_global_variables_to_output(const int & time_step,
+void Analysis_Model::write_global_variables_to_output(const int & time_step,
   const float & time_value, const float * global_var_vals)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_global_variables_to_output()";
+  string method_name = "Analysis_Model::write_global_variables_to_output()";
   oss << "Writing global variables to output";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1378,15 +1409,15 @@ void Mesh_Manager::write_global_variables_to_output(const int & time_step,
     global_var_vals);
 }
 
-void Mesh_Manager::write_nodal_variable_to_output(const int & time_step,
+void Analysis_Model::write_nodal_variable_to_output(const int & time_step,
   const float & time_value, const float * nodal_var_vals,
   const int & node_var_index)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_nodal_variable_to_output()";
+  string method_name = "Analysis_Model::write_nodal_variable_to_output()";
   oss << "Writing nodal variable to output";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
 
@@ -1401,15 +1432,15 @@ void Mesh_Manager::write_nodal_variable_to_output(const int & time_step,
     my_num_nodes, nodal_var_vals);
 }
 
-void Mesh_Manager::write_element_variable_to_output(const int & time_step,
+void Analysis_Model::write_element_variable_to_output(const int & time_step,
   const float & time_value, const float * elem_var_vals,
   const int & ele_var_index, const int & block_index)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::write_element_variable_to_output()";
+  string method_name = "Analysis_Model::write_element_variable_to_output()";
   oss << "Writing element variable to output";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
   int error;
   if (!my_output_initialized)
@@ -1423,7 +1454,7 @@ void Mesh_Manager::write_element_variable_to_output(const int & time_step,
     elem_var_vals);
 }
 
-void Mesh_Manager::close_output_file()
+void Analysis_Model::close_output_file()
 {
   int error;
   error = ex_close(my_output_exoid);
@@ -1463,13 +1494,13 @@ bool gather_field_data(unsigned expected_num_rel, const field_type & field,
   return result;
 }
 
-bool Mesh_Manager::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh)
+bool Analysis_Model::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh)
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
-  string method_name = "Mesh_Manager::verify_coordinates_field()";
+  string method_name = "Analysis_Model::verify_coordinates_field()";
   oss << "Verifying the coordinates in the STK mesh...";
-  progress_message(&oss,method_name);
+  progress_message(&oss, method_name);
 #endif
 
   bool result = true;
@@ -1518,12 +1549,13 @@ bool Mesh_Manager::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh)
       }
 
 #ifdef DEBUG_OUTPUT
-      for (int node_index=0; node_index<num_nodes; ++node_index )
+      for (int node_index = 0; node_index < num_nodes; ++node_index)
       {
         log() << "                   node " << node_index + 1 << ": ";
-        for (int coord_index=0; coord_index<dim; ++coord_index)
+        for (int coord_index = 0; coord_index < dim; ++coord_index)
         {
-          log() << "[" << coord_index << "] = " << elem_coord[node_index][coord_index] << " ";
+          log() << "[" << coord_index << "] = "
+              << elem_coord[node_index][coord_index] << " ";
         }
         log() << endl;
       }

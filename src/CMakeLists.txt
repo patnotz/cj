@@ -12,7 +12,7 @@ SET(SOURCES
 	drive_simulation.cpp
 	log.cpp
 	messages.cpp 
-	mesh_manager.cpp
+	analysis_model.cpp
 	stk_mesh.cpp
   )
 
