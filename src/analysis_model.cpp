@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include <analysis_model.h>
+#include <physics.h>
 #include <messages.h>
 #include <log.h>
 #include <stk_mesh/base/MetaData.hpp>
@@ -23,150 +24,33 @@
 #include <exodusII.h>
 #include <netcdf.h>
 
+
 using namespace std;
 
 Analysis_Model_Factory::Analysis_Model_Factory(){}
 
-Teuchos::RCP<Analysis_Model> Analysis_Model_Factory::create(const char * input_file_name, const char * output_file_name)
+Teuchos::RCP<Analysis_Model> Analysis_Model_Factory::create(const char * input_file_name, const char * output_file_name, const std::string & name)
 {
   using Teuchos::rcp;
-
-  // Create new Peridigm object
-  return rcp(new Analysis_Model(input_file_name, output_file_name));
+  return rcp(new Analysis_Model(input_file_name, output_file_name, name));
 }
 
-Analysis_Model::Analysis_Model(const char * input_file_name,
-  const char * output_file_name) :
-    my_input_file_name(input_file_name), my_output_file_name(output_file_name), my_input_initialized(
-      false), my_output_initialized(false)
+Analysis_Model::Analysis_Model(const char * input_file_name, const char * output_file_name, const std::string & name) :
+    my_input_file_name(input_file_name),
+    my_output_file_name(output_file_name),
+    my_input_initialized(false),
+    my_output_initialized(false),
+    my_name(name)
 {
+  stringstream oss1;
+  oss1 << my_input_file_name;
+  my_input_file_name_str = oss1.str();
+  stringstream oss2;
+  oss2 << my_output_file_name;
+  my_output_file_name_str = oss2.str();
 }
 
-Analysis_Model::~Analysis_Model()
-{
-}
-
-void Analysis_Model::initialize_mesh_parts_and_commit(
-  stk::mesh::STK_Mesh * const mesh)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::initialize_mesh_parts()";
-  oss << "Initializing mesh parts";
-  progress_message(&oss, method_name);
-#endif
-  if (!my_input_initialized)
-  {
-    oss << "Output not initialized yet.";
-    error_message(&oss);
-    exit(1);
-  }
-#ifdef DEBUG_OUTPUT
-  oss << "Populating the stk PartVector";
-  sub_progress_message(&oss);
-#endif
-  // populate the list of block parts
-  for (int i = 0; i < my_num_elem_blk; ++i)
-  {
-    const string elem_type = my_elem_types.find(my_block_ids[i])->second;
-    oss << "block_" << my_block_ids[i] << "_" << elem_type;
-    const string part_name = oss.str();
-    oss.str("");
-    oss.clear();
-
-    stk::mesh::Part * part_ptr = part_pointer(mesh, elem_type, part_name);
-    mesh->my_parts.push_back(part_ptr);
-  }
-#ifdef DEBUG_OUTPUT
-  for (int i = 0; i < my_num_elem_blk; ++i)
-  {
-    oss << mesh->my_parts[i]->name();
-    sub_sub_progress_message(&oss);
-  }
-#endif
-  mesh->my_fem_metaData.commit(); // this has to be called before we can modify the mesh
-#ifdef DEBUG_OUTPUT
-  oss << "Mesh committed, adding the elements";
-  sub_progress_message(&oss);
-#endif
-}
-
-std::vector<std::string> Analysis_Model::get_field_names(
-  stk::mesh::STK_Mesh * const mesh, stk::mesh::EntityRank entity_rank,
-  unsigned field_rank)
-{
-  std::vector<std::string> nodal_vars_vec;
-  const stk::mesh::FieldVector & fields = mesh->my_fem_metaData.get_fields();
-  unsigned nfields = fields.size();
-  //std::cout << "Number of fields = " << fields.size() << std::endl;
-  for (unsigned ifld = 0; ifld < nfields; ifld++)
-  {
-    stk::mesh::FieldBase *field = fields[ifld];
-    //std::cout << "Field[" << ifld << "]= " << field->name() << " rank= " << field->rank() << std::endl;
-    //std::cout << "info>    " << *field << std::endl;
-    if (field->rank() == field_rank) // scalar or vector
-    {
-      unsigned nfr = field->restrictions().size();
-      //std::cout << "number of field restrictions= " << nfr << std::endl;
-      for (unsigned ifr = 0; ifr < nfr; ifr++)
-      {
-        const stk::mesh::FieldRestriction & fr = field->restrictions()[ifr];
-        //std::cout << fr.key.rank();
-        if (fr.entity_rank() == entity_rank) // nodal, element, etc.
-        {
-          string field_name = field->name();
-          //std::cout << "this is the field name: " << field_name << endl;
-          nodal_vars_vec.push_back(field_name);
-          //std::cout << "Field[" << ifld << "]= " << field->name() << std::endl;
-        }
-      }
-    }
-  }
-  return nodal_vars_vec;
-}
-
-void Analysis_Model::print_field_info(stk::mesh::STK_Mesh * const mesh)
-{
-  log() << "  =============== REGISTERED NODAL SCALAR FIELDS ==============="
-      << endl;
-  std::vector<std::string> nodal_scalar_fields = get_field_names(mesh,
-    mesh->my_node_rank, 0);
-  for (int i = 0; i < nodal_scalar_fields.size(); ++i)
-  {
-    log() << "  " << nodal_scalar_fields[i] << endl;
-  }
-  log() << "  =============== REGISTERED NODAL VECTOR FIELDS ==============="
-      << endl;
-  std::vector<std::string> nodal_vector_fields = get_field_names(mesh,
-    mesh->my_node_rank, 1);
-  for (int i = 0; i < nodal_vector_fields.size(); ++i)
-  {
-    log() << "  " << nodal_vector_fields[i] + "_x" << endl;
-    log() << "  " << nodal_vector_fields[i] + "_y" << endl;
-    if (mesh->my_spatial_dimension > 2) log() << "  "
-        << nodal_vector_fields[i] + "_z" << endl;
-  }
-  log() << "  ============== REGISTERED ELEMENT SCALAR FIELDS =============="
-      << endl;
-  std::vector<std::string> element_scalar_fields = get_field_names(mesh,
-    mesh->my_elem_rank, 0);
-  for (int i = 0; i < element_scalar_fields.size(); ++i)
-  {
-    log() << "  " << element_scalar_fields[i] << endl;
-  }
-  log() << "  ============== REGISTERED ELEMENT VECTOR FIELDS =============="
-      << endl;
-  std::vector<std::string> element_vector_fields = get_field_names(mesh,
-    mesh->my_elem_rank, 1);
-  for (int i = 0; i < element_vector_fields.size(); ++i)
-  {
-    log() << "  " << element_vector_fields[i] << endl;
-  }
-  log() << "  =============================================================="
-      << endl;
-}
-
-int Analysis_Model::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,
+int Analysis_Model::get_nodal_variable_index(Teuchos::RCP<stk::mesh::STK_Mesh> const mesh,
   const std::string & name, const std::string & component)
 {
   string comp = "";
@@ -204,7 +88,7 @@ int Analysis_Model::get_nodal_variable_index(stk::mesh::STK_Mesh * const mesh,
   return -1;
 }
 
-int Analysis_Model::get_element_variable_index(stk::mesh::STK_Mesh * const mesh,
+int Analysis_Model::get_element_variable_index(Teuchos::RCP<stk::mesh::STK_Mesh> const mesh,
   const std::string & name, const std::string & component)
 {
   string comp = "";
@@ -242,177 +126,8 @@ int Analysis_Model::get_element_variable_index(stk::mesh::STK_Mesh * const mesh,
   return -1;
 }
 
-void Analysis_Model::populate_mesh_elements(stk::mesh::STK_Mesh * const mesh)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::populate_mesh_elements()";
-  oss << "Populating mesh elements";
-  progress_message(&oss, method_name);
-#endif
-  mesh->my_bulkData.modification_begin(); // Begin modifying the mesh
-  int ele_map_index = 0;
-  for (int block = 0; block < my_num_elem_blk; ++block)
-  {
-    int * connectivity = my_connectivities.find(my_block_ids[block])->second;
-    const string elem_type = my_elem_types.find(my_block_ids[block])->second;
-    for (int ele = 0; ele < my_num_elem_in_block[block]; ++ele)
-    {
-      stk::mesh::EntityId node_ids[my_num_nodes_per_elem[block]];
-      stk::mesh::EntityId elem_id = my_elem_map[ele_map_index];
-
-      // Note declare_element expects a cell topology
-      // to have been attached to the part
-      map_node_ids(block, ele, node_ids, elem_type, connectivity);
-#ifdef DEBUG_OUTPUT
-      oss << "ExodusII: ";
-      int base = 0;
-      if (elem_type == "QUAD4")
-      {
-        base = (ele) * 4;
-      }
-      else if (elem_type == "HEX8")
-      {
-        base = (ele) * 8;
-      }
-      else if (elem_type == "TETRA4" || elem_type == "TETRA")
-      {
-        base = (ele) * 4;
-      }
-      else if (elem_type == "TRI3")
-      {
-        base = (ele) * 3;
-      }
-      for (int node = 0; node < my_num_nodes_per_elem[block]; ++node)
-      {
-        oss << connectivity[base + node] << ",";
-      }
-      oss << " -> STK mesh: ";
-      for (int node = 0; node < my_num_nodes_per_elem[block]; ++node)
-      {
-        oss << node_ids[node] << ",";
-      }
-      sub_sub_progress_message(&oss);
-#endif
-#ifdef DEBUG_OUTPUT
-      oss << "Adding element id: " << elem_id << " in block "
-          << mesh->my_parts[block]->name();
-      sub_sub_progress_message(&oss);
-#endif
-      stk::mesh::fem::declare_element(mesh->my_bulkData, *mesh->my_parts[block],
-        elem_id, node_ids);
-      ele_map_index++;
-    }
-  }
-  // Done modifying the mesh.
-  // Modifications on the local parallel process are communicated
-  // among processes, verified for consistency, and changes to
-  // parallel shared/ghosted mesh entities are synchronized.
-  mesh->my_bulkData.modification_end();
-}
-
-void Analysis_Model::populate_bogus_vector_field(stk::mesh::STK_Mesh * const mesh,
-  stk::mesh::VectorFieldType & field, const stk::mesh::EntityRank & rank)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::populate_bogus_vector_field()";
-  oss << "Populating bogus vector field " << field.name();
-  progress_message(&oss, method_name);
-#endif
-  const std::vector<stk::mesh::Bucket*> & buckets = mesh->my_bulkData.buckets(
-    rank);
-
-  for (std::vector<stk::mesh::Bucket*>::const_iterator bucket_it =
-      buckets.begin(); bucket_it != buckets.end(); ++bucket_it)
-  {
-    const stk::mesh::Bucket & bucket = **bucket_it;
-    stk::mesh::BucketArray<stk::mesh::VectorFieldType> field_array(field,
-      bucket);
-    const int num_components = field_array.dimension(0); // this should be linked to the spatial dim
-    const int num_items_in_bucket = field_array.dimension(1); //this is linked to the bucket size
-    for (int i = 0; i < num_items_in_bucket; ++i)
-    {
-      const unsigned id = bucket[i].identifier();
-      double * values = &field_array(0, i);
-      values[0] = id * 100000.0;
-      values[1] = id * 100100.0;
-      if (num_components > 2) values[2] = id * 100200.0;
-    }
-  }
-}
-
-void Analysis_Model::populate_bogus_scalar_field(stk::mesh::STK_Mesh * const mesh,
-  stk::mesh::ScalarFieldType & field, const stk::mesh::EntityRank & rank)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::populate_bogus_scalar_field()";
-  oss << "Populating bogus scalar field " << field.name();
-  progress_message(&oss, method_name);
-#endif
-  const std::vector<stk::mesh::Bucket*> & buckets = mesh->my_bulkData.buckets(
-    rank);
-
-  for (std::vector<stk::mesh::Bucket*>::const_iterator bucket_it =
-      buckets.begin(); bucket_it != buckets.end(); ++bucket_it)
-  {
-    const stk::mesh::Bucket & bucket = **bucket_it;
-    stk::mesh::BucketArray<stk::mesh::ScalarFieldType> field_array(field,
-      bucket);
-    const int num_items_in_bucket = field_array.dimension(0); //this is linked to the bucket size
-    for (int i = 0; i < num_items_in_bucket; ++i)
-    {
-      const unsigned item_id = bucket[i].identifier();
-      if (rank == mesh->my_elem_rank) field_array(i) = item_id * 1150.6;
-      else
-        field_array(i) = item_id * 4.6890;
-    }
-  }
-}
-
-void Analysis_Model::populate_mesh_coordinates(stk::mesh::STK_Mesh * const mesh)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::populate_mesh_coorindates()";
-  oss << "Populating STK mesh";
-  progress_message(&oss, method_name);
-#endif
-  const std::vector<stk::mesh::Bucket*> & node_buckets =
-      mesh->my_bulkData.buckets(mesh->my_node_rank);
-
-  for (std::vector<stk::mesh::Bucket*>::const_iterator node_bucket_it =
-      node_buckets.begin(); node_bucket_it != node_buckets.end();
-      ++node_bucket_it)
-      {
-    const stk::mesh::Bucket & bucket = **node_bucket_it;
-#ifdef DEBUG_OUTPUT
-    oss << "Coordinates field for bucket " << bucket.key();
-    sub_sub_progress_message(&oss);
-#endif
-    // Fill the nodal coordinates.
-    // Create a multidimensional array view of the
-    // nodal coordinates field data for this bucket of nodes.
-    // The array is two dimensional ( Cartesian X NumberNodes )
-    // and indexed by ( 0..2 , 0..NumerNodes-1 )
-    stk::mesh::BucketArray<stk::mesh::VectorFieldType> coordinates_array(
-      mesh->my_coordinates_field, bucket);
-    const int num_sets_of_coords = coordinates_array.dimension(1); //this is linked to the bucket size
-    for (int i = 0; i < num_sets_of_coords; ++i)
-    {
-      const unsigned node_id = bucket[i].identifier();
-      map_node_coordinates(node_id, &coordinates_array(0, i));
-    }
-  }
-  //Now that x, y, and z are in the stk mesh field we can delete the temp data storage
-  delete my_x;
-  delete my_y;
-  if (my_num_dim > 2) delete my_z;
-}
-
 void Analysis_Model::map_node_coordinates(stk::mesh::EntityId node_id,
-  double coord[])
+  double coord[]) const
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -437,7 +152,7 @@ void Analysis_Model::map_node_coordinates(stk::mesh::EntityId node_id,
 
 void Analysis_Model::map_node_ids(const int block, const int ele,
   stk::mesh::EntityId node_ids[], const string & elem_type,
-  const int * connectivity)
+  const int * connectivity) const
 {
   stringstream oss;
 #ifdef DEBUG_OUTPUT
@@ -504,54 +219,6 @@ void Analysis_Model::map_node_ids(const int block, const int ele,
   }
 }
 
-stk::mesh::Part * const
-Analysis_Model::part_pointer(stk::mesh::STK_Mesh * const mesh,
-  const string & elem_type, const string & name)
-{
-  stringstream oss;
-  stk::mesh::Part * part_ptr;
-
-  if (elem_type == "QUAD4")
-  {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part<
-        shards::Quadrilateral<4> >(mesh->my_fem_metaData, name);
-    part_ptr = &part;
-  }
-  else if (elem_type == "HEX8")
-  {
-    stk::mesh::Part & part =
-        stk::mesh::fem::declare_part<shards::Hexahedron<8> >(
-          mesh->my_fem_metaData, name);
-    part_ptr = &part;
-  }
-  else if (elem_type == "TETRA4" || elem_type == "TETRA")
-  {
-    stk::mesh::Part & part =
-        stk::mesh::fem::declare_part<shards::Tetrahedron<4> >(
-          mesh->my_fem_metaData, name);
-    part_ptr = &part;
-  }
-  else if (elem_type == "TRI3")
-  {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part<shards::Triangle<3> >(
-      mesh->my_fem_metaData, name);
-    part_ptr = &part;
-  }
-  else if (elem_type == "SPHERE")
-  {
-    stk::mesh::Part & part = stk::mesh::fem::declare_part<shards::Particle>(
-      mesh->my_fem_metaData, name);
-    part_ptr = &part;
-  }
-  else
-  {
-    oss << "part_pointer() does not recognize element type: " << elem_type;
-    error_message(&oss);
-    exit(1);
-  }
-  return part_ptr;
-}
-
 void Analysis_Model::read_mesh()
 {
   stringstream oss;
@@ -561,11 +228,14 @@ void Analysis_Model::read_mesh()
   int CPU_word_size = 0;
   int IO_word_size = 0;
   /*open exodus II file */
+
+  const char * file_name = input_file_name().c_str();
+
   my_input_exoid =
-      ex_open(my_input_file_name,EX_READ,&CPU_word_size,&IO_word_size,&version);
+      ex_open(file_name,EX_READ,&CPU_word_size,&IO_word_size,&version);
   if (my_input_exoid < 0)
   {
-    oss << "Reading mesh failure.";
+    oss << "Reading mesh failure: " << file_name;
     error_message(&oss);
     exit(1);
   }
@@ -588,8 +258,10 @@ void Analysis_Model::initialize_read()
   int error;
   stringstream oss;
 
+  const char * file_name = input_file_name().c_str();
+
 #ifdef DEBUG_OUTPUT
-  oss << "Reading file: " << my_input_file_name;
+  oss << "Reading file: " << file_name;
   progress_message(&oss, method_name);
 #endif
   /* read database parameters */
@@ -598,12 +270,16 @@ void Analysis_Model::initialize_read()
 error  = ex_get_init(my_input_exoid, title, &my_num_dim, &my_num_nodes, &my_num_elem,
     &my_num_elem_blk, &my_num_node_sets, &my_num_side_sets);
 
-  log()
+log()
+    << endl
+    << "  --------------------------------------------------------------------------------------"
       << endl
-      << "  ----------------------------------------------------------------------------"
+      << "    Analysis model: " << my_name
       << endl
       << "    Title: "
       << title
+      << endl
+      << "    Input file: " << my_input_file_name_str << "    Output file: " << my_output_file_name_str
       << endl
       << "    Spatial dimension: "
       << my_num_dim
@@ -620,7 +296,7 @@ error  = ex_get_init(my_input_exoid, title, &my_num_dim, &my_num_nodes, &my_num_
       << my_num_side_sets
       << " side set(s)"
       << endl
-      << "  ----------------------------------------------------------------------------"
+      << "  --------------------------------------------------------------------------------------"
       << endl;
 }
 
@@ -844,12 +520,15 @@ dist_fact    = new float[my_num_df_in_side_set[i]]; // FIXME: free me later
 }
 
 void Analysis_Model::initialize_output(const char * title,
-  stk::mesh::STK_Mesh & mesh)
+  Teuchos::RCP<stk::mesh::STK_Mesh> const mesh)
 {
-#ifdef DEBUG_OUTPUT
+  const char * file_name = output_file_name().c_str();
+
+  #ifdef DEBUG_OUTPUT
   string method_name = "Analysis_Model::write_output()";
   stringstream oss;
-  oss << "Writing output file: " << my_output_file_name;
+
+  oss << "Writing output file: " << file_name;
   progress_message(&oss, method_name);
 #endif
 
@@ -859,7 +538,7 @@ void Analysis_Model::initialize_output(const char * title,
   int IO_word_size = 0;
   /* create EXODUS II file */
   my_output_exoid =
-      ex_create (my_output_file_name,EX_CLOBBER,&CPU_word_size, &IO_word_size);
+      ex_create (file_name,EX_CLOBBER,&CPU_word_size, &IO_word_size);
 
   error = ex_put_init(my_output_exoid, title, my_num_dim, my_num_nodes,
     my_num_elem, my_num_elem_blk, my_num_node_sets, my_num_side_sets);
@@ -869,12 +548,12 @@ void Analysis_Model::initialize_output(const char * title,
   //    write_nodal_vector(mesh,coordinates_field);
 
   write_elem_map();
-  write_elem_blocks(mesh);
+  write_elem_blocks();
   write_elem_connectivities();
   write_node_sets();
   write_side_sets();
   write_qa_records();
-  write_variable_names(&mesh);
+  write_variable_names(mesh);
 
   // Truth table for element variables?
   //	/* write element variable truth table */
@@ -890,7 +569,7 @@ void Analysis_Model::initialize_output(const char * title,
   my_output_initialized = true;
 }
 
-void Analysis_Model::write_coordinates(const stk::mesh::STK_Mesh & mesh)
+void Analysis_Model::write_coordinates(Teuchos::RCP<stk::mesh::STK_Mesh> mesh)
 {
   stringstream oss;
 
@@ -908,10 +587,10 @@ void Analysis_Model::write_coordinates(const stk::mesh::STK_Mesh & mesh)
   bool result = true;
 
   const stk::mesh::VectorFieldType & coordinates_field =
-      mesh.my_coordinates_field;
-  const stk::mesh::BulkData & bulkData = mesh.my_bulkData;
+      mesh->my_coordinates_field;
+  const stk::mesh::BulkData & bulkData = mesh->my_bulkData;
   const std::vector<stk::mesh::Bucket*> & node_buckets =
-      mesh.my_bulkData.buckets(mesh.my_node_rank);
+      mesh->my_bulkData.buckets(mesh->my_node_rank);
 
   for (std::vector<stk::mesh::Bucket*>::const_iterator node_bucket_it =
       node_buckets.begin(); node_bucket_it != node_buckets.end();
@@ -920,7 +599,7 @@ void Analysis_Model::write_coordinates(const stk::mesh::STK_Mesh & mesh)
     const stk::mesh::Bucket & bucket = **node_bucket_it;
 
     stk::mesh::BucketArray<stk::mesh::VectorFieldType> coordinates_array(
-      mesh.my_coordinates_field, bucket);
+      mesh->my_coordinates_field, bucket);
     const int num_sets_of_coords = coordinates_array.dimension(1); //this is linked to the bucket size
     for (int i = 0; i < num_sets_of_coords; ++i)
     {
@@ -940,7 +619,7 @@ void Analysis_Model::write_coordinates(const stk::mesh::STK_Mesh & mesh)
 }
 
 void Analysis_Model::write_nodal_scalar(const int & time_step,
-  const float & time_value, stk::mesh::STK_Mesh & mesh,
+  const float & time_value, Teuchos::RCP<stk::mesh::STK_Mesh> mesh,
   const stk::mesh::ScalarFieldType & field)
 {
   stringstream oss;
@@ -952,7 +631,7 @@ void Analysis_Model::write_nodal_scalar(const int & time_step,
   int error;
   float values[my_num_nodes];
   const std::vector<stk::mesh::Bucket*> & node_buckets =
-      mesh.my_bulkData.buckets(mesh.my_node_rank);
+      mesh->my_bulkData.buckets(mesh->my_node_rank);
 
   for (std::vector<stk::mesh::Bucket*>::const_iterator node_bucket_it =
       node_buckets.begin(); node_bucket_it != node_buckets.end();
@@ -969,12 +648,12 @@ void Analysis_Model::write_nodal_scalar(const int & time_step,
       values[index] = field_array(i);
     }
   }
-  const int var_index = get_nodal_variable_index(&mesh, field.name(), "");
+  const int var_index = get_nodal_variable_index(mesh, field.name(), "");
   write_nodal_variable_to_output(time_step, time_value, values, var_index);
 }
 
 void Analysis_Model::write_nodal_vector(const int & time_step,
-  const float & time_value, stk::mesh::STK_Mesh & mesh,
+  const float & time_value, Teuchos::RCP<stk::mesh::STK_Mesh> mesh,
   const stk::mesh::VectorFieldType & field)
 {
   stringstream oss;
@@ -986,13 +665,13 @@ void Analysis_Model::write_nodal_vector(const int & time_step,
   int error;
   float values[my_num_nodes];
   const std::vector<stk::mesh::Bucket*> & node_buckets =
-      mesh.my_bulkData.buckets(mesh.my_node_rank);
+      mesh->my_bulkData.buckets(mesh->my_node_rank);
 
   string components[3];
   components[0] = "x";
   components[1] = "y";
   components[2] = "z";
-  for (int comp = 0; comp < mesh.my_spatial_dimension; ++comp)
+  for (int comp = 0; comp < mesh->my_spatial_dimension; ++comp)
   {
     for (std::vector<stk::mesh::Bucket*>::const_iterator node_bucket_it =
         node_buckets.begin(); node_bucket_it != node_buckets.end();
@@ -1009,7 +688,7 @@ void Analysis_Model::write_nodal_vector(const int & time_step,
         values[index] = field_array(comp, i);
       }
     }
-    const int var_index = get_nodal_variable_index(&mesh, field.name(),
+    const int var_index = get_nodal_variable_index(mesh, field.name(),
       components[comp]);
     write_nodal_variable_to_output(time_step, time_value, values, var_index);
   }
@@ -1029,7 +708,7 @@ bool bucket_blocks_contain_block_named(const stk::mesh::Bucket & bucket,
 }
 
 void Analysis_Model::write_element_scalar(const int & time_step,
-  const float & time_value, stk::mesh::STK_Mesh & mesh,
+  const float & time_value, Teuchos::RCP<stk::mesh::STK_Mesh> mesh,
   const stk::mesh::ScalarFieldType & field)
 {
   stringstream oss;
@@ -1046,7 +725,7 @@ void Analysis_Model::write_element_scalar(const int & time_step,
     const int num_elements = num_elem_in_block(blk);
     float values[num_elements];
     const std::vector<stk::mesh::Bucket*> & elem_buckets =
-        mesh.my_bulkData.buckets(mesh.my_elem_rank); // get all of the element buckets
+        mesh->my_bulkData.buckets(mesh->my_elem_rank); // get all of the element buckets
 
     // TODO this could be done more efficiently, but I don't know how yet.
     // As it is we rip over all the buckets for each block and only keep the
@@ -1059,7 +738,7 @@ void Analysis_Model::write_element_scalar(const int & time_step,
         {
       const stk::mesh::Bucket & bucket = **elem_bucket_it;
       bool bucket_has_block = bucket_blocks_contain_block_named(bucket,
-        mesh.my_parts[blk]->name());
+        mesh->my_parts[blk]->name());
       if (!bucket_has_block) continue;
       // Now populate the array of element values for this block tha come from this bucket
       stk::mesh::BucketArray<stk::mesh::ScalarFieldType> field_array(field,
@@ -1073,14 +752,14 @@ void Analysis_Model::write_element_scalar(const int & time_step,
         array_index++;
       }
     }
-    const int var_index = get_element_variable_index(&mesh, field.name(), "");
+    const int var_index = get_element_variable_index(mesh, field.name(), "");
     write_element_variable_to_output(time_step, time_value, values, var_index,
       blk);
   }
 }
 
 void Analysis_Model::write_element_vector(const int & time_step,
-  const float & time_value, stk::mesh::STK_Mesh & mesh,
+  const float & time_value, Teuchos::RCP<stk::mesh::STK_Mesh> mesh,
   const stk::mesh::VectorFieldType & field)
 {
   stringstream oss;
@@ -1095,7 +774,7 @@ void Analysis_Model::write_element_vector(const int & time_step,
   components[0] = "x";
   components[1] = "y";
   components[2] = "z";
-  for (int comp = 0; comp < mesh.my_spatial_dimension; ++comp)
+  for (int comp = 0; comp < mesh->my_spatial_dimension; ++comp)
   {
     for (int blk = 0; blk < num_blocks(); blk++)
     {
@@ -1103,7 +782,7 @@ void Analysis_Model::write_element_vector(const int & time_step,
       const int num_elements = num_elem_in_block(blk);
       float values[num_elements];
       const std::vector<stk::mesh::Bucket*> & elem_buckets =
-          mesh.my_bulkData.buckets(mesh.my_elem_rank); // get all of the element buckets
+          mesh->my_bulkData.buckets(mesh->my_elem_rank); // get all of the element buckets
 
       // TODO this could be done more efficiently, but I don't know how yet.
       // As it is we rip over all the buckets for each block and only keep the
@@ -1117,7 +796,7 @@ void Analysis_Model::write_element_vector(const int & time_step,
         const stk::mesh::Bucket & bucket = **elem_bucket_it;
 
         bool bucket_has_block = bucket_blocks_contain_block_named(bucket,
-          mesh.my_parts[blk]->name());
+          mesh->my_parts[blk]->name());
         if (!bucket_has_block) continue;
         // Now populate the array of element values for this block tha come from this bucket
         stk::mesh::BucketArray<stk::mesh::VectorFieldType> field_array(field,
@@ -1129,7 +808,7 @@ void Analysis_Model::write_element_vector(const int & time_step,
           array_index++;
         }
       }
-      const int var_index = get_element_variable_index(&mesh, field.name(),
+      const int var_index = get_element_variable_index(mesh, field.name(),
         components[comp]);
       write_element_variable_to_output(time_step, time_value, values, var_index,
         blk);
@@ -1149,7 +828,7 @@ void Analysis_Model::write_elem_map()
   error = ex_put_map(my_output_exoid, my_elem_map);
 }
 
-void Analysis_Model::write_elem_blocks(const stk::mesh::STK_Mesh & mesh)
+void Analysis_Model::write_elem_blocks()
 {
 #ifdef DEBUG_OUTPUT
   string method_name = "Analysis_Model::write_elem_blocks()";
@@ -1275,7 +954,7 @@ void Analysis_Model::write_qa_records()
   error = ex_put_qa(my_output_exoid, num_qa_rec, qa_record);
 }
 
-void Analysis_Model::write_variable_names(stk::mesh::STK_Mesh * const mesh)
+void Analysis_Model::write_variable_names(Teuchos::RCP<stk::mesh::STK_Mesh> mesh)
 {
 #ifdef DEBUG_OUTPUT
   string method_name = "Analysis_Model::write_variable_names()";
@@ -1363,11 +1042,13 @@ void Analysis_Model::write_time_step_info(const int & time_step_num,
 #endif
   int error;
 
+  const char * file_name = output_file_name().c_str();
+
   if (!my_output_initialized)
   {
     oss
         << "Output file is not initialized, can't write time step info to file: "
-        << my_output_file_name;
+        << file_name;
     error_message(&oss);
   }
   error = ex_put_time(my_output_exoid, time_step_num, &time_value);
@@ -1397,11 +1078,13 @@ void Analysis_Model::write_global_variables_to_output(const int & time_step,
 #endif
   int error;
 
+  const char * file_name = output_file_name().c_str();
+
   if (!my_output_initialized)
   {
     oss
         << "Output file is not initialized, can't write global variables to file: "
-        << my_output_file_name;
+        << file_name;
     error_message(&oss);
   }
   int num_glo_vars = my_global_variable_names.size();
@@ -1421,11 +1104,13 @@ void Analysis_Model::write_nodal_variable_to_output(const int & time_step,
 #endif
   int error;
 
+  const char * file_name = output_file_name().c_str();
+
   if (!my_output_initialized)
   {
     oss
         << "Output file is not initialized, can't write nodal variables to file: "
-        << my_output_file_name;
+        << file_name;
     error_message(&oss);
   }
   error = ex_put_nodal_var(my_output_exoid, time_step, node_var_index,
@@ -1443,10 +1128,11 @@ void Analysis_Model::write_element_variable_to_output(const int & time_step,
   progress_message(&oss, method_name);
 #endif
   int error;
+  const char * file_name = output_file_name().c_str();
   if (!my_output_initialized)
   {
     oss << "Output file is not initialized, can't write variables to file: "
-        << my_output_file_name;
+        << file_name;
     error_message(&oss);
   }
   error = ex_put_elem_var(my_output_exoid, time_step, ele_var_index,
@@ -1493,75 +1179,3 @@ bool gather_field_data(unsigned expected_num_rel, const field_type & field,
   }
   return result;
 }
-
-bool Analysis_Model::verify_coordinates_field(const stk::mesh::STK_Mesh & mesh)
-{
-  stringstream oss;
-#ifdef DEBUG_OUTPUT
-  string method_name = "Analysis_Model::verify_coordinates_field()";
-  oss << "Verifying the coordinates in the STK mesh...";
-  progress_message(&oss, method_name);
-#endif
-
-  bool result = true;
-
-  const stk::mesh::VectorFieldType & coordinates_field =
-      mesh.my_coordinates_field;
-  const stk::mesh::BulkData & bulkData = mesh.my_bulkData;
-
-  // All element buckets:
-  const std::vector<stk::mesh::Bucket*> & elem_buckets = bulkData.buckets(
-    mesh.my_elem_rank);
-
-  // Verify coordinates_field by gathering the nodal coordinates
-  // from each element's nodes.
-  for (std::vector<stk::mesh::Bucket*>::const_iterator element_bucket_it =
-      elem_buckets.begin(); element_bucket_it != elem_buckets.end();
-      ++element_bucket_it)
-      {
-
-    const stk::mesh::Bucket& bucket = **element_bucket_it;
-    const size_t num_buckets = bucket.size();
-    const CellTopologyData * cellTopologyData =
-        stk::mesh::fem::get_cell_topology(bucket).getCellTopologyData();
-
-    const int num_nodes = cellTopologyData->node_count;
-    const int & dim = mesh.my_spatial_dimension;
-    double elem_coord[num_nodes][dim];
-
-    for (size_t bucket_index = 0; bucket_index < num_buckets; ++bucket_index)
-    {
-      const stk::mesh::Entity & elem = bucket[bucket_index];
-
-#ifdef DEBUG_OUTPUT
-      oss << "Element " << elem.identifier();
-      sub_sub_progress_message(&oss);
-#endif
-
-      const bool gather_result = gather_field_data(num_nodes, coordinates_field,
-        elem, &elem_coord[0][0], mesh.my_node_rank, dim);
-
-      if (gather_result == false)
-      {
-        oss << "verify_coordinates_field() gather was not successful";
-        error_message(&oss);
-        exit(1);
-      }
-
-#ifdef DEBUG_OUTPUT
-      for (int node_index = 0; node_index < num_nodes; ++node_index)
-      {
-        log() << "                   node " << node_index + 1 << ": ";
-        for (int coord_index = 0; coord_index < dim; ++coord_index)
-        {
-          log() << "[" << coord_index << "] = "
-              << elem_coord[node_index][coord_index] << " ";
-        }
-        log() << endl;
-      }
-#endif
-    }
-  }
-  return result;
-}
-

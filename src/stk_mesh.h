@@ -41,7 +41,6 @@ public:
   const EntityRank my_node_rank;
 
   VectorFieldType & my_coordinates_field;
-
 };
 
 } //namespace mesh

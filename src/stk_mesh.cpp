@@ -15,7 +15,8 @@ STK_Mesh::STK_Mesh(stk::ParallelMachine comm, const int & spatial_dim) :
   Part & universal = my_fem_metaData.universal_part();
   put_field(my_coordinates_field, my_node_rank, universal,
     my_spatial_dimension);
-  // commit will be called by the mesh_manager when it has populated the parts
+  // commit will be called by the physics when it has populated the parts
+
 }
 
 STK_Mesh::~STK_Mesh()

@@ -14,6 +14,10 @@ SET(SOURCES
 	messages.cpp 
 	analysis_model.cpp
 	stk_mesh.cpp
+	physics.cpp
+	enums.cpp
+	simulation.cpp
+	input_parser.cpp
   )
 
 SET(HEADERS
